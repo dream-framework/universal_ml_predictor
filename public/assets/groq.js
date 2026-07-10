@@ -11,7 +11,7 @@ window.Groq = (function () {
 // Get it from your Render dashboard after deploying (see DEPLOY.md).
 // Example: 'https://predictor-backend-xyz.onrender.com'
 // ============================================================================
-const BACKEND_URL = '';  // ← paste your Render URL here
+const BACKEND_URL = 'https://universal-ml-predictor.onrender.com';  // ← paste your Render URL here
 
 function isConfigured() {
   return !!BACKEND_URL;
