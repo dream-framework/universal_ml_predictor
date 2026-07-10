@@ -46,6 +46,42 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ── Fetch proxy ───────────────────────────────────────────────────────────
+// Some sources (Yahoo Finance, etc.) block browser fetches via CORS or
+// require a User-Agent. The browser calls this endpoint with ?url=...;
+// we fetch server-side with a real UA and return the body with CORS headers.
+app.get('/fetch-proxy', async (req, res) => {
+  let url = req.query.url;
+  if (!url) return res.status(400).json({ error: 'Missing ?url= parameter' });
+  // Safety: only allow http(s)
+  if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'URL must start with http:// or https://' });
+
+  // Yahoo Finance: query1 is heavily rate-limited; query2 usually works.
+  // Auto-rewrite query1 → query2 so users pasting either URL get data.
+  url = url.replace('query1.finance.yahoo.com', 'query2.finance.yahoo.com');
+
+  try {
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json,text/csv,text/plain,*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+    });
+    if (!r.ok) {
+      return res.status(r.status).json({ error: `Upstream returned HTTP ${r.status} for ${url}` });
+    }
+    const text = await r.text();
+    // Pass through content-type so the browser parser picks the right adapter
+    const ct = r.headers.get('content-type') || 'text/plain';
+    res.set('Content-Type', ct);
+    res.send(text);
+  } catch (err) {
+    res.status(502).json({ error: `Proxy fetch failed: ${err.message}` });
+  }
+});
+
 // ── Main endpoint ─────────────────────────────────────────────────────────
 app.post('/groq-chat', async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || 'unknown';
@@ -60,32 +96,31 @@ app.post('/groq-chat', async (req, res) => {
   try {
     const { message, analysis, history, mode, model } = req.body || {};
 
-    const systemPrompt = `You are the Predictor bot. You analyze time series and explain what you see in plain English.
+    const systemPrompt = `You are the Predictor bot. You analyze time series and explain what you see in plain English — DETAILED but LACONIC.
 
-When the system gives you an analysis payload, it contains:
-- The source series (label, number of points, latest timestamp, unit)
-- A fit-quality score (fit.r2) between 0 and 1
-- A verdict: 'HOLDS' (structured), 'WEAK' (mixed), or 'FAILS' (noisy)
-  — use the words 'structured', 'mixed', or 'noisy' instead of the codes
-- An ML prediction comparing OUR MODEL against a BASELINE model
+PAYLOAD FIELDS:
+- series: label, source, n_points, latest_t, unit, first_value, last_value
+- fit.r2: 0-1 score, higher = more predictable structure
+- verdict: HOLDS (structured), WEAK (mixed), FAILS (noisy)
+- ml: model_*/baseline_* for hit_rate, next_return, mae; n_test, n_train
 
-HOW TO EXPLAIN:
-1. Start with what the data is.
-2. Translate the verdict into plain English.
-3. Mention the ML prediction honestly. If our model didn't beat baseline, say so.
-4. End with: this is a structural diagnostic, not a guaranteed forecast.
-
-RULES:
-- Keep replies to 3-5 short paragraphs. No equations.
-- NEVER mention S2, stretched exponential, retention curve, D, lambda, λq, or any internal parameter name.
-- If asked about the method: "Our model has been benchmarked against established forecasting frameworks (ARIMA, GARCH, exponential smoothing, gradient-boosted trees) and outperforms them on directional accuracy. The specific method is proprietary pending publication."
-- Never invent numbers — only cite values in the analysis payload.
-- If the data is too short, say so and ask for more.`;
+STYLE — DETAILED BUT LACONIC:
+- Aim for 4-6 sentences total, split across 2 short paragraphs.
+- Every sentence must carry information. No filler, no preamble, no "Let me explain", no "Based on the analysis", no "It's worth noting".
+- Cut every word that isn't load-bearing. "The signal appears to be somewhat structured" → "Signal is structured."
+- Cover: (1) what the data is, (2) the structural assessment with the fit-quality number, (3) what that means in practice (durable vs fragile, predictable vs noisy), (4) the ML prediction with both hit rates, (5) whether our model beats baseline and by how much, (6) one honest caveat if relevant.
+- Use 'structured', 'mixed', or 'noisy' — never the codes HOLDS/WEAK/FAILS.
+- Numbers stay specific: "66% hit rate vs 65% baseline" not "slightly better than baseline".
+- No equations. No jargon. No "structural diagnostic" boilerplate.
+- NEVER mention S2, stretched exponential, retention curve, D, lambda, λq.
+- If asked about the method: "Benchmarked against ARIMA/GARCH/gradient-boosted trees; method is proprietary pending publication."
+- If data is too short: "Need at least 30 points — got N."
+- Only cite numbers from the payload. Never invent.`;
 
     let messages;
     if (mode === 'free') {
       messages = [
-        { role: 'system', content: systemPrompt + '\n\nThe user has not provided data yet. Answer conversationally. If they want analysis, ask them to paste a URL or upload a file. Stay in plain English. Never mention S2, DREAM, stretched exponential, retention curve, or any proprietary method name.' },
+        { role: 'system', content: systemPrompt + '\n\nUser has not provided data. Answer TERSELY (max 2 sentences). If they want analysis, ask for a URL or file. Plain English. Never mention S2, DREAM, stretched exponential, retention curve, or any proprietary method name.' },
         ...(history || []).slice(-10).map(h => ({ role: h.role, content: h.content })),
         { role: 'user', content: message || '(empty)' },
       ];
@@ -135,8 +170,8 @@ RULES:
       body: JSON.stringify({
         model: model || DEFAULT_MODEL,
         messages,
-        temperature: 0.4,
-        max_tokens: 800,
+        temperature: 0.3,
+        max_tokens: 450,
       }),
     });
 
