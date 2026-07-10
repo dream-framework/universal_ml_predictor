@@ -1,0 +1,29 @@
+# Render Blueprint — one-click deploy of the backend.
+# Render reads this file and creates the service automatically when you
+# connect your GitHub repo.
+#
+# After connecting:
+#   1. Render creates the service with these settings.
+#   2. Go to Environment tab → add GROQ_API_KEY = your gsk_... key.
+#   3. Deploy. Your backend is live at https://predictor-xyz.onrender.com
+#   4. Paste that URL into public/assets/groq.js as BACKEND_URL.
+
+services:
+  - type: web
+    name: predictor-backend
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18.0.0
+      # GROQ_API_KEY must be set manually in Render → Environment
+      # (do NOT commit it here)
+      - key: GROQ_API_KEY
+        sync: false

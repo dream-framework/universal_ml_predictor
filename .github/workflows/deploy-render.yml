@@ -1,0 +1,47 @@
+name: deploy-render
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'render.yaml'
+      - '.github/workflows/deploy-render.yml'
+  workflow_dispatch:
+
+# Triggers a Render deploy via Render's deploy hook URL.
+# One-time setup:
+#   1. On Render: New → Web Service → connect this GitHub repo.
+#      Render reads render.yaml and pre-fills everything.
+#      In Environment, add GROQ_API_KEY = your gsk_... key.
+#      Deploy. Copy the service URL.
+#   2. On Render: Settings → Deploy Hook → Create deploy hook → copy URL.
+#   3. On GitHub: repo → Settings → Secrets → Actions → add:
+#      RENDER_DEPLOY_HOOK_URL = the URL from step 2
+#   4. Push any commit touching server/ — this Action fires and pokes Render.
+#
+# The GROQ_API_KEY stays on Render only — never in GH secrets, never in repo.
+# Render auto-deploys on push by itself; this Action is a backup in case
+# Render's GitHub webhook ever fails.
+
+jobs:
+  trigger-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        if: env.RENDER_DEPLOY_HOOK_URL != ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "Triggering Render deploy hook…"
+          curl -s -X POST "$RENDER_DEPLOY_HOOK_URL" -H "Content-Type: application/json" -d '{}'
+          echo "Done. Render will build and deploy in the background."
+
+      - name: No deploy hook configured
+        if: env.RENDER_DEPLOY_HOOK_URL == ''
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          echo "::warning::RENDER_DEPLOY_HOOK_URL secret is not set."
+          echo "See .github/workflows/deploy-render.yml header for setup instructions."
+          echo "Render still auto-deploys via its own GitHub webhook — this Action is just a backup."

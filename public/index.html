@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Predictor · Paste data, get a dazzling readout</title>
+  <meta name="description" content="Paste a link to a time series or drop a file. The bot reads it, benchmarks our model, and shows you dazzling charts — all in your browser." />
+  <link rel="stylesheet" href="./assets/style.css?v=20260710-pages-1" />
+</head>
+<body>
+  <div class="app">
+    <!-- ═══ TOP BAR ════════════════════════════════════════════════════ -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">●</span>
+        <div>
+          <div class="brand-name">Predictor</div>
+          <div class="brand-sub">paste data · get a readout</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="status-chip" id="statusChip"><span class="dot"></span><b id="statusText">checking</b></div>
+      </div>
+    </header>
+
+    <!-- ═══ HERO ═══════════════════════════════════════════════════════ -->
+    <section class="hero">
+      <h1>Paste data. Get a dazzling readout.</h1>
+      <p class="hero-sub">
+        Drop in any time series — a stock feed, a sensor log, a CSV of weekly sales.
+        The bot reads it, benchmarks our model against established forecasting frameworks,
+        and shows you five interactive charts. All in your browser, nothing leaves your machine
+        except the URL you paste.
+      </p>
+    </section>
+
+    <!-- ═══ MAIN: CHAT (LEFT) + DASHBOARD (RIGHT) ═══════════════════════ -->
+    <section class="main-grid">
+      <!-- CHAT -->
+      <div class="chat-panel">
+        <div class="panel-head">
+          <h2>Talk to the bot</h2>
+          <p>Paste a URL, drop a file, or ask anything.</p>
+        </div>
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="msg bot">
+            <div class="avatar">●</div>
+            <div class="bubble">
+              <p>Hi! Paste a link to a CSV or JSON file, or drop one in the box below. I'll read it, run the analysis, and the dashboard on the right will light up.</p>
+              <p>Good examples to try:</p>
+              <ul>
+                <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code></li>
+                <li><code>https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=2y&interval=1d</code></li>
+                <li>Any CSV with a date column and a numeric column</li>
+              </ul>
+              <p class="muted">The bot uses a shared key on the backend — just paste a URL or drop a file to get started.</p>
+            </div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="dropzone" id="dropzone" tabindex="0">
+            <p><b>Drop a CSV / JSON / TSV file here</b> · or click to choose</p>
+            <input type="file" id="fileInput" accept=".csv,.json,.tsv,.txt" hidden />
+          </div>
+          <div class="input-row">
+            <textarea id="chatInput" rows="2" placeholder="Paste a URL, drop a file above, or ask anything…  (Enter = send, Shift+Enter = newline)"></textarea>
+            <button id="sendBtn" type="button">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DASHBOARD -->
+      <div class="dashboard-panel">
+        <div class="panel-head">
+          <h2>Dashboard</h2>
+          <p id="dashSubtitle">Five views of your signal. Updates with every analysis.</p>
+        </div>
+        <div class="dash-tabs">
+          <button class="dash-tab active" type="button" data-dash="series">📈 Series</button>
+          <button class="dash-tab" type="button" data-dash="predictions">🎯 Predictions</button>
+          <button class="dash-tab" type="button" data-dash="matchup">⚖ Match-up</button>
+          <button class="dash-tab" type="button" data-dash="rolling">📊 Rolling</button>
+          <button class="dash-tab" type="button" data-dash="phase">🌌 Phase</button>
+        </div>
+        <div id="dashboard" class="dashboard-content">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <p>No data yet. Paste a URL or drop a file to populate the dashboard.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FOOTER ══════════════════════════════════════════════════════ -->
+    <footer class="footer">
+      <span>Static site on GitHub Pages · Groq proxy on Render · shared key never exposed to visitors.</span>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  <script src="./assets/engine.js?v=20260710-pages-1"></script>
+  <script src="./assets/adapters.js?v=20260710-pages-1"></script>
+  <script src="./assets/groq.js?v=20260710-pages-1"></script>
+  <script src="./assets/app.js?v=20260710-pages-1"></script>
+</body>
+</html>
