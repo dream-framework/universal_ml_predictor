@@ -1,21 +1,17 @@
 // ============================================================================
-// Minimal Express server — the only server-side code.
+// Predictor backend — minimal Express proxy for Groq.
 // Holds the shared GROQ_API_KEY as an env var (set on Render, never in repo)
-// and proxies /groq-chat to api.groq.com.
-//
-// Everything else (analysis engine, charts, dashboard) runs in the browser
-// on GitHub Pages. This server is just a 60-line Groq proxy.
+// and proxies /groq-chat requests from the GitHub Pages site to api.groq.com.
 // ============================================================================
 
 const express = require('express');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
 
-// Per-IP rate limit (in-memory, resets on redeploy).
+// ── Per-IP rate limit (in-memory, resets on redeploy) ─────────────────────
 // Groq free tier = 30 req/min global, 14k/day. 5/min/IP is generous + safe.
 const RATE_LIMIT = { windowMs: 60_000, max: 5 };
 const ipHits = new Map();
@@ -28,9 +24,20 @@ function rateLimited(ip) {
   return false;
 }
 
+// ── Middleware ────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '1mb' }));
 
-// Health check — Render pings this to know the service is up
+// CORS for ALL routes — set headers on every response, including errors.
+app.use((req, res, next) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  // Handle preflight here so OPTIONS never falls through to 404
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  next();
+});
+
+// ── Health check ──────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({
     ok: true,
@@ -39,14 +46,8 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Main endpoint — proxied from the Pages site
+// ── Main endpoint ─────────────────────────────────────────────────────────
 app.post('/groq-chat', async (req, res) => {
-  // CORS — allow your Pages site (and localhost for dev)
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(204).end();
-
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || 'unknown';
   if (rateLimited(ip)) {
     return res.status(429).json({ error: 'Rate limit: 5 requests per minute. Try again shortly.' });
@@ -125,6 +126,7 @@ RULES:
   }
 });
 
+// ── Start ─────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Predictor backend on :${PORT}`);
   console.log(`  Groq: ${process.env.GROQ_API_KEY ? 'configured' : 'NOT configured (set GROQ_API_KEY on Render)'}`);
