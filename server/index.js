@@ -90,9 +90,39 @@ RULES:
         { role: 'user', content: message || '(empty)' },
       ];
     } else {
+      // Build a SLIM summary for Groq — don't send raw arrays (they blow past the
+      // 12k TPM free-tier limit). Groq only needs the summary numbers to write
+      // its explanation; the full arrays stay in the browser for charts.
+      const s = analysis?.series || {};
+      const ml = analysis?.ml || {};
+      const slim = {
+        series: {
+          label: s.label,
+          source: s.source,
+          n_points: s.n_points,
+          latest_t: s.latest_t,
+          unit: s.unit,
+          first_value: s.first_value,
+          last_value: s.last_value,
+        },
+        fit: analysis?.fit,
+        verdict: analysis?.verdict,
+        ml: {
+          horizon: ml.horizon,
+          model_next_return: ml.model_next_return,
+          model_hit_rate: ml.model_hit_rate,
+          model_mae: ml.model_mae,
+          baseline_next_return: ml.baseline_next_return,
+          baseline_hit_rate: ml.baseline_hit_rate,
+          baseline_mae: ml.baseline_mae,
+          n_test: ml.n_test,
+          n_train: ml.n_train,
+          error: ml.error,
+        },
+      };
       messages = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `The user said: "${message || ''}"\n\nI fetched and analyzed their data. Here are the results:\n\n${JSON.stringify(analysis, null, 2)}\n\nExplain these results to the user in plain English. Be specific about the numbers. Use the words 'structured', 'mixed', or 'noisy' — never the internal codes. If our model beats baseline, mention it. If not, mention that honestly. Never mention S2, stretched exponential, retention curve, D, or lambda.` },
+        { role: 'user', content: `The user said: "${message || ''}"\n\nI fetched and analyzed their data. Here are the results:\n\n${JSON.stringify(slim, null, 2)}\n\nExplain these results to the user in plain English. Be specific about the numbers. Use the words 'structured', 'mixed', or 'noisy' — never the internal codes. If our model beats baseline, mention it. If not, mention that honestly. Never mention S2, stretched exponential, retention curve, D, or lambda.` },
       ];
     }
 
