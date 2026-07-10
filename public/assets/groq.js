@@ -19,11 +19,34 @@ function isConfigured() {
 
 async function callBackend(payload) {
   if (!BACKEND_URL) throw new Error('Backend URL not set. Edit public/assets/groq.js and set BACKEND_URL to your deployed Render URL. See DEPLOY.md.');
-  const r = await fetch(BACKEND_URL + '/groq-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  
+  // 30s timeout — Render free tier takes ~20s to wake from sleep
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  
+  let r;
+  try {
+    r = await fetch(BACKEND_URL + '/groq-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('Backend timed out (30s). Render free tier may be waking up — try again in a moment.');
+    // Network error — likely cold start connection drop. Retry once.
+    try {
+      r = await fetch(BACKEND_URL + '/groq-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err2) {
+      throw new Error('Cannot reach backend. It may be waking up from sleep — try again in 10 seconds. (' + err2.message + ')');
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!r.ok) {
     const errText = await r.text();
     let msg = `Backend HTTP ${r.status}`;
