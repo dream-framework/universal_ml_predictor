@@ -49,8 +49,9 @@
               <p>Hi! Paste a link to a CSV or JSON file, or drop one in the box below. I'll read it, run the analysis, and the dashboard on the right will light up.</p>
               <p>Good examples to try:</p>
               <ul>
-                <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code></li>
-                <li><code>https://query2.finance.yahoo.com/v8/finance/chart/^GSPC?range=2y&interval=1d</code></li>
+                <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code> — global earthquakes, hourly counts, 30 days</li>
+                <li><code>https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily</code> — BTC daily closes, 1 year</li>
+                <li><code>https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXUSEU</code> — USD/EUR exchange rate, ~20 years daily</li>
                 <li>Any CSV with a date column and a numeric column</li>
               </ul>
               <p class="muted">The bot uses a shared key on the backend — just paste a URL or drop a file to get started.</p>
@@ -58,6 +59,14 @@
           </div>
         </div>
         <div class="composer">
+          <div class="feed-picker">
+            <label>
+              <span>Quick pick:</span>
+              <select id="feedSelect"><option value="">Loading feeds…</option></select>
+            </label>
+            <button id="feedLoadBtn" type="button" class="ghost-btn-sm">Load</button>
+            <span id="feedDesc" class="feed-desc"></span>
+          </div>
           <div class="dropzone" id="dropzone" tabindex="0">
             <p><b>Drop a CSV / JSON / TSV file here</b> · or click to choose</p>
             <input type="file" id="fileInput" accept=".csv,.json,.tsv,.txt" hidden />
