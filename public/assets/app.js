@@ -12,6 +12,7 @@ const state = {
   activeTab: 'series',
   charts: {},  // tab-name -> echarts instance (dashboard)
   fsChart: null,  // fullscreen chart instance
+  feeds: [],  // loaded from feeds.json
 };
 
 const VERDICT_LABELS = {
@@ -297,11 +298,13 @@ function ensureFsOverlay() {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#07091a;display:none;padding:24px;';
     overlay.innerHTML = `
       <div id="fsChartHost" style="width:100%;height:100%;"></div>
-      <button id="fsExit" type="button" style="position:fixed;top:16px;right:16px;z-index:10000;background:#60a5fa;color:#0a0f1d;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13px;">× Exit fullscreen</button>
-      <div id="fsTabs" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10000;display:flex;gap:4px;background:rgba(11,18,32,0.85);padding:6px;border-radius:10px;border:1px solid #2d3a52;"></div>
+      <button id="fsExit" type="button" title="Exit fullscreen (Esc)" style="position:fixed;bottom:16px;right:16px;z-index:10000;background:rgba(11,18,32,0.7);color:#8b97ad;border:1px solid #2d3a52;padding:6px 10px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all 0.15s;">×</button>
+      <div id="fsTabs" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10000;display:flex;gap:4px;background:rgba(11,18,32,0.7);padding:6px;border-radius:10px;border:1px solid #2d3a52;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);"></div>
     `;
     document.body.appendChild(overlay);
     $('fsExit').onclick = () => toggleFullscreen();
+    $('fsExit').onmouseenter = (e) => { e.target.style.color = '#60a5fa'; e.target.style.borderColor = '#60a5fa'; };
+    $('fsExit').onmouseleave = (e) => { e.target.style.color = '#8b97ad'; e.target.style.borderColor = '#2d3a52'; };
     // Build tab buttons in the overlay (mirrors dashboard tabs)
     const tabs = [
       ['series', '📈 Series'],
@@ -567,8 +570,9 @@ function resetChat() {
         <p>Hi! Paste a link to a CSV or JSON file, or drop one in the box below. I'll read it, run the analysis, and the dashboard on the right will light up.</p>
         <p>Good examples to try:</p>
         <ul>
-          <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code></li>
-          <li><code>https://query2.finance.yahoo.com/v8/finance/chart/^GSPC?range=2y&interval=1d</code></li>
+          <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code> — global earthquakes, hourly counts, 30 days</li>
+          <li><code>https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily</code> — BTC daily closes, 1 year</li>
+          <li><code>https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXUSEU</code> — USD/EUR exchange rate, ~20 years daily</li>
           <li>Any CSV with a date column and a numeric column</li>
         </ul>
         <p class="muted">The bot uses a shared key on the backend — just paste a URL or drop a file to get started.</p>
@@ -705,10 +709,55 @@ function closeRegistryModal() {
   $('registryModal').classList.remove('show');
 }
 
+// ── Feed picker (loads feeds.json on startup) ─────────────────────────────
+async function loadFeeds() {
+  const sel = $('feedSelect');
+  try {
+    const r = await fetch('./feeds.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    state.feeds = (data.feeds || []).filter(f => f.url);
+    if (!state.feeds.length) {
+      sel.innerHTML = '<option value="">(no feeds available)</option>';
+      return;
+    }
+    // Group by domain
+    const byDomain = {};
+    for (const f of state.feeds) {
+      const d = f.domain || 'other';
+      if (!byDomain[d]) byDomain[d] = [];
+      byDomain[d].push(f);
+    }
+    const optGroups = Object.entries(byDomain).map(([domain, feeds]) => {
+      const opts = feeds.map(f => `<option value="${esc(f.url)}">${esc(f.label)}</option>`).join('');
+      return `<optgroup label="${esc(domain)}">${opts}</optgroup>`;
+    }).join('');
+    sel.innerHTML = `<option value="">— Pick a feed to analyze —</option>${optGroups}`;
+    sel.onchange = () => {
+      const f = state.feeds.find(x => x.url === sel.value);
+      $('feedDesc').textContent = f ? f.description || '' : '';
+    };
+    $('feedLoadBtn').onclick = () => {
+      if (!sel.value) {
+        $('feedSelect').focus();
+        return;
+      }
+      $('chatInput').value = sel.value;
+      $('chatInput').focus();
+      // Trigger autosend so user doesn't have to click Send
+      send();
+    };
+  } catch (err) {
+    sel.innerHTML = '<option value="">(feeds failed to load)</option>';
+    console.warn('feeds.json load failed:', err);
+  }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 function init() {
   wireDropzone();
   wireTabs();
+  loadFeeds();  // async, populates the dropdown
   $('sendBtn').addEventListener('click', send);
   $('chatInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
