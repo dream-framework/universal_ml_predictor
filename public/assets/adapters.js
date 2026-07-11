@@ -51,8 +51,24 @@ function seriesFromCSV(text, label = 'CSV upload') {
 
 function seriesFromJSON(text, label = 'JSON upload') {
   const body = JSON.parse(text);
+
+  // Alpha Vantage: demo key returns {"Information": "..."} or {"Note": "..."}
+  // instead of real data. Detect and give a friendly error.
+  if (body && (body.Information || body.Note)) {
+    throw new Error('Alpha Vantage says: ' + (body.Information || body.Note) + ' — get a free key at https://www.alphavantage.co/support/#api-key and add apikey=YOUR_KEY to the URL. The demo key only works for IBM intraday, not full daily.');
+  }
+  // Alpha Vantage real response: {"Time Series (Daily)": {"2026-07-10": {"1. open":..., "4. close":...}, ...}}
+  if (body && body['Time Series (Daily)']) {
+    const ts = body['Time Series (Daily)'];
+    const points = Object.entries(ts)
+      .map(([date, ohlc]) => ({ t: date, v: Number(ohlc['4. close']) }))
+      .filter(p => Number.isFinite(p.v))
+      .sort((a, b) => a.t.localeCompare(b.t));
+    if (points.length) return { points, label: label + ' (close)', unit: 'usd', source: 'Alpha Vantage' };
+  }
+
   let arr = Array.isArray(body) ? body : (body.data || body.points || body.values || body.prices || body.features || []);
-  if (!Array.isArray(arr)) throw new Error('JSON must be array, or object with .data/.points/.values/.prices/.features array');
+  if (!Array.isArray(arr)) throw new Error('JSON must be array, or object with .data/.points/.values/.prices/.features array, or Alpha Vantage "Time Series (Daily)" shape');
 
   if (body?.chart?.result?.[0]) {
     const r = body.chart.result[0];
@@ -113,20 +129,50 @@ function seriesFromJSON(text, label = 'JSON upload') {
 }
 
 async function fetchAndAdapt(url) {
-  const r = await fetch(url, { cache: 'no-store', redirect: 'follow' });
-  if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url}`);
-  const ct = (r.headers.get('content-type') || '').toLowerCase();
-  const text = await r.text();
-  let parsed;
-  if (ct.includes('json') || url.endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
-    parsed = seriesFromJSON(text, url);
-  } else if (ct.includes('csv') || ct.includes('text') || url.endsWith('.csv') || url.endsWith('.tsv') || url.endsWith('.txt')) {
-    parsed = seriesFromCSV(text, url);
-  } else {
-    try { parsed = seriesFromJSON(text, url); }
-    catch { parsed = seriesFromCSV(text, url); }
+  // Try direct first (works for CORS-open sources: USGS, NOAA, CoinGecko, etc.)
+  try {
+    const r = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+    if (r.ok) {
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      const text = await r.text();
+      try {
+        return parseByText(text, url, ct);
+      } catch (e) {
+        // fall through to proxy
+      }
+    }
+  } catch (e) {
+    // CORS or network error — fall through to proxy
   }
-  return parsed;
+
+  // Fallback: route through the backend proxy (handles CORS + User-Agent).
+  // The backend has a /fetch-proxy?url=... endpoint that fetches server-side.
+  if (window.Groq && window.Groq.isConfigured()) {
+    // We piggyback on the BACKEND_URL by reading it from the Groq module.
+    // (Slight hack but avoids a second config knob.)
+    const backendUrl = window.Groq._backendUrl();
+    if (backendUrl) {
+      const proxyUrl = backendUrl + '/fetch-proxy?url=' + encodeURIComponent(url);
+      const r = await fetch(proxyUrl, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url} (via proxy)`);
+      const text = await r.text();
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      return parseByText(text, url, ct);
+    }
+  }
+
+  throw new Error(`Cannot fetch ${url} — direct fetch failed (CORS or network) and no backend proxy configured. Try a different URL, or set BACKEND_URL in public/assets/groq.js.`);
+}
+
+function parseByText(text, url, ct) {
+  if (ct.includes('json') || url.endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+    return seriesFromJSON(text, url);
+  }
+  if (ct.includes('csv') || ct.includes('text') || url.endsWith('.csv') || url.endsWith('.tsv') || url.endsWith('.txt')) {
+    return seriesFromCSV(text, url);
+  }
+  try { return seriesFromJSON(text, url); }
+  catch { return seriesFromCSV(text, url); }
 }
 
 return { fetchAndAdapt, seriesFromCSV, seriesFromJSON };
