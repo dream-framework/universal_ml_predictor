@@ -433,30 +433,50 @@ function renderPredictionsTab(chart) {
 function renderMatchupTab(chart) {
   const a = state.analysis;
   const ml = a.ml;
-  if (!ml || ml.error) {
+  if (!ml || (ml.regression?.error && ml.classification?.error)) {
     chart.setOption({ title: { text: 'No ML comparison available', left: 'center', top: 'center', textStyle: { color: '#8b97ad' } } });
     return;
   }
+
+  // Build a multi-model comparison table.
+  // Regression: hit_rate for each model
+  // Classification: accuracy for each model
+  const regModels = ml.regression && !ml.regression.error ? [
+    { name: 'Ridge (our features)', hit: ml.regression.ridge_s2?.hit_rate, mae: ml.regression.ridge_s2?.mae, color: '#34d399' },
+    { name: 'Ridge (baseline feats)', hit: ml.regression.ridge_baseline?.hit_rate, mae: ml.regression.ridge_baseline?.mae, color: '#ff9a4a' },
+    { name: 'kNN (k=5)', hit: ml.regression.knn?.hit_rate, mae: ml.regression.knn?.mae, color: '#60a5fa' },
+    { name: 'Mean baseline', hit: ml.regression.mean?.hit_rate, mae: ml.regression.mean?.mae, color: '#8b97ad' },
+  ].filter(m => m.hit != null) : [];
+
+  const clsModels = ml.classification && !ml.classification.error ? [
+    { name: 'Logistic', acc: ml.classification.models?.logistic?.accuracy, color: '#34d399' },
+    { name: 'kNN', acc: ml.classification.models?.knn?.accuracy, color: '#60a5fa' },
+    { name: 'Naive Bayes', acc: ml.classification.models?.naive_bayes?.accuracy, color: '#f472b6' },
+    { name: 'Majority', acc: ml.classification.models?.majority?.accuracy, color: '#8b97ad' },
+  ].filter(m => m.acc != null) : [];
+
+  // Combine: show regression hit rates and classification accuracies side by side
+  const allModels = [
+    ...regModels.map(m => ({ name: m.name + ' (reg)', value: m.hit, color: m.color, metric: 'hit rate' })),
+    ...clsModels.map(m => ({ name: m.name + ' (cls)', value: m.acc, color: m.color, metric: 'accuracy' })),
+  ];
+
+  if (!allModels.length) {
+    chart.setOption({ title: { text: 'No ML models could be trained on this data', left: 'center', top: 'center', textStyle: { color: '#8b97ad' } } });
+    return;
+  }
+
   chart.setOption({
     ...commonChartOpts(false),
-    title: { text: 'Our model vs baseline', left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
-    grid: { left: 60, right: 30, top: 38, bottom: 30 },
-    xAxis: { type: 'category', data: ['hit rate', 'MAE (lower better)', 'next return'], axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' } },
-    yAxis: [
-      { type: 'value', axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad', formatter: (v) => (v * 100).toFixed(0) + '%' }, splitLine: { lineStyle: { color: '#1f2937' } } },
-    ],
-    series: [
-      {
-        name: 'our model', type: 'bar', data: [ml.model_hit_rate, ml.model_mae, Math.abs(ml.model_next_return)],
-        itemStyle: { color: '#34d399', borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top', color: '#e5e7eb', formatter: (p) => p.value.toFixed(3) },
-      },
-      {
-        name: 'baseline', type: 'bar', data: [ml.baseline_hit_rate, ml.baseline_mae, Math.abs(ml.baseline_next_return)],
-        itemStyle: { color: '#ff9a4a', borderRadius: [4, 4, 0, 0] },
-        label: { show: true, position: 'top', color: '#e5e7eb', formatter: (p) => p.value.toFixed(3) },
-      },
-    ],
+    title: { text: 'All models — regression hit rate & classification accuracy', left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
+    grid: { left: 100, right: 30, top: 38, bottom: 30 },
+    xAxis: { type: 'value', axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad', formatter: (v) => (v * 100).toFixed(0) + '%' }, splitLine: { lineStyle: { color: '#1f2937' } }, max: 1 },
+    yAxis: { type: 'category', data: allModels.map(m => m.name).reverse(), axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad', fontSize: 11 } },
+    series: [{
+      type: 'bar',
+      data: allModels.map(m => ({ value: m.value, itemStyle: { color: m.color, borderRadius: [0, 4, 4, 0] } })).reverse(),
+      label: { show: true, position: 'right', color: '#e5e7eb', formatter: (p) => (p.value * 100).toFixed(1) + '%' },
+    }],
   });
 }
 
