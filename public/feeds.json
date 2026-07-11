@@ -6,7 +6,7 @@
       "label": "🌍 USGS Global Earthquakes (30 days, hourly)",
       "domain": "geophysical",
       "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson",
-      "description": "Every recorded earthquake worldwide, bucketed into hourly counts. ~720 points. Stable, CORS-open, no key.",
+      "description": "Every recorded earthquake worldwide, bucketed into hourly counts. ~720 points. CORS-open, no key.",
       "n_points_estimate": 720
     },
     {
@@ -17,55 +17,6 @@
       "n_points_estimate": 366
     },
     {
-      "label": "💵 USD/EUR exchange rate (20 years daily, FRED)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXUSEU",
-      "description": "Federal Reserve daily USD/EUR exchange rate. ~7,000+ points going back to 1999. CSV format. CORS-open, no key.",
-      "n_points_estimate": 7000
-    },
-    {
-      "label": "📈 10-Year Treasury yield (daily, FRED)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10",
-      "description": "Daily 10-year US Treasury constant maturity rate. ~14,000 points back to 1962. CSV. CORS-open, no key.",
-      "n_points_estimate": 14000
-    },
-    {
-      "label": "📉 3-Month T-Bill yield (daily, FRED)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DTB3",
-      "description": "Daily 3-month Treasury bill secondary market rate. ~15,000 points back to 1954. CSV. CORS-open, no key.",
-      "n_points_estimate": 15000
-    },
-    {
-      "label": "🌀 VIX volatility index (daily, FRED)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=VIXCLS",
-      "description": "CBOE VIX daily close. ~9,000 points back to 1990. CSV. CORS-open, no key.",
-      "n_points_estimate": 9000
-    },
-    {
-      "label": "🌐 S&P 500 daily close (FRED SP500)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500",
-      "description": "S&P 500 daily close, ~17,000 points back to 1950. CSV. CORS-open, no key.",
-      "n_points_estimate": 17000
-    },
-    {
-      "label": "☀️ NOAA solar wind speed (real-time, 1-min)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
-      "description": "Real-time solar wind proton speed from NOAA SWPC. ~3,000 points (last 2 days at 1-min cadence). JSON. CORS-open, no key.",
-      "n_points_estimate": 3000
-    },
-    {
-      "label": "🧲 NOAA planetary K-index (3-hourly)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
-      "description": "Planetary K index every 3 hours. ~1,000 points (last 4 months). JSON. CORS-open, no key.",
-      "n_points_estimate": 1000
-    },
-    {
       "label": "🪙 Ethereum daily closes (1 year, CoinGecko)",
       "domain": "crypto",
       "url": "https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=365&interval=daily",
@@ -73,19 +24,26 @@
       "n_points_estimate": 366
     },
     {
-      "label": "🏭 US Industrial Production Index (monthly, FRED)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=INDPRO",
-      "description": "Industrial Production Index, monthly. ~1,300 points back to 1919. CSV. CORS-open, no key.",
-      "n_points_estimate": 1300
+      "label": "☀️ NOAA solar wind speed (real-time, 1-min)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
+      "description": "Real-time solar wind proton speed from NOAA SWPC. ~3,000 points (last 2 days at 1-min cadence). CORS-open, no key.",
+      "n_points_estimate": 3000
     },
     {
-      "label": "💼 US Unemployment rate (monthly, FRED)",
-      "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=UNRATE",
-      "description": "US unemployment rate, monthly. ~950 points back to 1948. CSV. CORS-open, no key.",
-      "n_points_estimate": 950
+      "label": "🧲 NOAA planetary K-index (3-hourly)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
+      "description": "Planetary K index every 3 hours. ~1,000 points (last 4 months). CORS-open, no key.",
+      "n_points_estimate": 1000
+    },
+    {
+      "label": "🌐 NOAA GOES X-ray flux (6-hour, real-time)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json",
+      "description": "GOES satellite X-ray flux at 1-min cadence for last 6 hours. ~360 points. CORS-open, no key.",
+      "n_points_estimate": 360
     }
   ],
-  "notes": "All feeds are CORS-open and require no API key. To add more, edit this file and submit a PR. Avoid: Yahoo Finance (blocks server-side), Stooq (JS challenge), Alpha Vantage demo key (returns Information message, not data)."
+  "notes": "All feeds are CORS-open (work direct from browser, no proxy needed) and require no API key. FRED CSV feeds were removed because FRED doesn't send CORS headers and free CORS proxies are unreliable. To add FRED back, set up a dedicated proxy. To add more CoinGecko coins, change the 'bitcoin' or 'ethereum' path segment in the URL."
 }
