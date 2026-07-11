@@ -67,9 +67,88 @@ function seriesFromJSON(text, label = 'JSON upload') {
     if (points.length) return { points, label: label + ' (close)', unit: 'usd', source: 'Alpha Vantage' };
   }
 
-  let arr = Array.isArray(body) ? body : (body.data || body.points || body.values || body.prices || body.features || []);
-  if (!Array.isArray(arr)) throw new Error('JSON must be array, or object with .data/.points/.values/.prices/.features array, or Alpha Vantage "Time Series (Daily)" shape');
+  // ── DREAM-site data source adapters ─────────────────────────────────────
+  // Each of these matches a source listed on https://dream-physics.onrender.com/retention
 
+  // NOAA SWPC GOES — array of {time_tag, flux/He/Hp/...} (X-rays, magnetometer, electrons, protons)
+  // Pick the most plausible numeric field automatically.
+  if (Array.isArray(body) && body.length && body[0].time_tag) {
+    const candidateFields = ['flux', 'Hp', 'total', 'proton_speed', 'proton_density', 'Kp', 'k_index'];
+    let field = candidateFields.find(f => Number.isFinite(Number(body[0][f])));
+    if (!field) {
+      // Pick first numeric field that's not time_tag/satellite/etc.
+      for (const k of Object.keys(body[0])) {
+        if (k === 'time_tag' || k === 'satellite' || k === 'energy' || k === 'electron_contaminaton' || k === 'arcjet_flag') continue;
+        if (Number.isFinite(Number(body[0][k]))) { field = k; break; }
+      }
+    }
+    if (field) {
+      const points = body
+        .map(r => ({ t: r.time_tag, v: Number(r[field]) }))
+        .filter(p => Number.isFinite(p.v));
+      if (points.length) return { points, label: label + ' (' + field + ')', unit: field, source: 'NOAA SWPC GOES' };
+    }
+  }
+
+  // NOAA SWPC planetary K-index — [[time_tag, k_index, ...], ...] (legacy) OR [{time_tag, Kp}, ...] (new)
+  if (Array.isArray(body) && body.length && Array.isArray(body[0])) {
+    const points = body.slice(1).map(row => ({ t: row[0], v: Number(row[1]) })).filter(p => Number.isFinite(p.v));
+    if (points.length) return { points, label: label + ' (Kp)', unit: 'Kp', source: 'NOAA SWPC' };
+  }
+
+  // USGS NWIS Instantaneous Values (Potomac flow etc.)
+  // Shape: {value: {timeSeries: [{values: [{value: [{value, dateTime}]}]}]}}
+  if (body?.value?.timeSeries?.length) {
+    const ts = body.value.timeSeries[0];
+    const varName = ts?.variable?.variableName || label;
+    const unitCode = ts?.variable?.unit?.unitCode || '';
+    const rawVals = ts.values[0]?.value || [];
+    const points = rawVals.map(v => ({ t: v.dateTime, v: Number(v.value) })).filter(p => Number.isFinite(p.v));
+    if (points.length) return { points, label: varName, unit: unitCode, source: 'USGS NWIS' };
+  }
+
+  // USGS GeoJSON (earthquakes) — bucket by hour
+  if (body?.features?.length && body.features[0]?.properties?.time != null) {
+    const buckets = new Map();
+    for (const f of body.features) {
+      const t = f.properties?.time;
+      if (t == null) continue;
+      const key = new Date(t).toISOString().slice(0, 13);
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    }
+    const points = [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => ({ t: k + ':00:00Z', v }));
+    if (points.length) return { points, label: 'Earthquakes (hourly counts)', unit: 'events/hour', source: 'USGS GeoJSON' };
+  }
+
+  // Wikimedia pageviews — {items: [{timestamp: "2024010100", views: 14175}, ...]}
+  if (body?.items?.length && body.items[0].views !== undefined) {
+    const points = body.items.map(it => ({
+      t: it.timestamp.slice(0, 4) + '-' + it.timestamp.slice(4, 6) + '-' + it.timestamp.slice(6, 8),
+      v: Number(it.views),
+    })).filter(p => Number.isFinite(p.v));
+    if (points.length) return { points, label: label + ' (daily views)', unit: 'views', source: 'Wikimedia Pageviews' };
+  }
+
+  // World Bank — [[meta], [{date, value, ...}, ...]]
+  if (Array.isArray(body) && body.length >= 2 && Array.isArray(body[1]) && body[1][0]?.date && 'value' in body[1][0]) {
+    const points = body[1]
+      .filter(r => r.value != null)
+      .map(r => ({ t: r.date, v: Number(r.value) }))
+      .filter(p => Number.isFinite(p.v))
+      .sort((a, b) => a.t.localeCompare(b.t));
+    if (points.length) return { points, label: label, unit: '', source: 'World Bank' };
+  }
+
+  // CoinGecko market_chart — {prices: [[ts_ms, price], ...]}
+  if (Array.isArray(body.prices) && body.prices.length && Array.isArray(body.prices[0])) {
+    const points = body.prices.map(row => ({
+      t: new Date(row[0]).toISOString().slice(0, 10),
+      v: Number(row[1]),
+    })).filter(p => Number.isFinite(p.v));
+    if (points.length) return { points, label, unit: 'usd', source: 'CoinGecko market_chart' };
+  }
+
+  // Yahoo chart
   if (body?.chart?.result?.[0]) {
     const r = body.chart.result[0];
     const ts = r.timestamp || [];
@@ -80,52 +159,50 @@ function seriesFromJSON(text, label = 'JSON upload') {
         points.push({ t: new Date(ts[i] * 1000).toISOString().slice(0, 10), v: Number(closes[i]) });
       }
     }
-    return { points, label: r.meta?.symbol || label, unit: 'index', source: 'Yahoo Finance chart' };
+    if (points.length) return { points, label: r.meta?.symbol || label, unit: 'index', source: 'Yahoo Finance chart' };
   }
 
-  if (Array.isArray(body.prices) && body.prices.length && Array.isArray(body.prices[0])) {
-    const points = body.prices.map(row => ({
-      t: new Date(row[0]).toISOString().slice(0, 10),
-      v: Number(row[1]),
-    })).filter(p => Number.isFinite(p.v));
-    return { points, label, unit: 'usd', source: 'CoinGecko market_chart' };
-  }
-
-  if (body?.features?.length && body.features[0]?.properties?.time != null) {
+  // iNaturalist — {results: [{created_at_details: {date, time}, ...}]}
+  // Bucket by day
+  if (body?.results?.length && body.results[0]?.created_at_details) {
     const buckets = new Map();
-    for (const f of body.features) {
-      const t = f.properties?.time;
-      if (t == null) continue;
-      const key = new Date(t).toISOString().slice(0, 13);
-      buckets.set(key, (buckets.get(key) || 0) + 1);
+    for (const r of body.results) {
+      const d = r.created_at_details?.date;
+      if (!d) continue;
+      buckets.set(d, (buckets.get(d) || 0) + 1);
     }
-    const points = [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => ({ t: k + ':00:00Z', v }));
-    return { points, label: 'Earthquakes (hourly counts)', unit: 'events/hour', source: 'USGS GeoJSON' };
+    const points = [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => ({ t: k, v }));
+    if (points.length) return { points, label: 'iNaturalist (daily counts)', unit: 'obs/day', source: 'iNaturalist' };
   }
 
+  // Fallback: try generic shapes
+  let arr = Array.isArray(body) ? body : (body.data || body.points || body.values || body.features || []);
+  if (!Array.isArray(arr)) throw new Error('Could not extract a time series from JSON payload. Supported: NOAA SWPC GOES/Kp, USGS NWIS/GeoJSON, Wikimedia pageviews, World Bank, CoinGecko, Yahoo chart, iNaturalist, Alpha Vantage, or generic arrays.');
+
+  // Array of numbers
   if (arr.length && typeof arr[0] === 'number') {
     return { points: arr.map((v, i) => ({ t: '', v: Number(v) })).filter(p => Number.isFinite(p.v)), label, unit: '', source: 'JSON numeric array' };
   }
-
+  // Array of [t, v] pairs
   if (arr.length && Array.isArray(arr[0]) && arr[0].length >= 2) {
     return {
       points: arr.map(row => ({ t: String(row[0]), v: Number(row[1] ?? row[0]) })).filter(p => Number.isFinite(p.v)),
       label, unit: '', source: 'JSON [t,v] array',
     };
   }
-
+  // Array of objects
   if (arr.length && typeof arr[0] === 'object') {
     const points = arr.map(item => {
       if (!item || typeof item !== 'object') return null;
-      const v = Number(item.v ?? item.value ?? item.y ?? item.close ?? item.metric ?? item.Kp ?? item.k_index ?? item.proton_speed);
-      const t = String(item.t ?? item.time ?? item.date ?? item.timestamp ?? item.x ?? item.time_tag ?? '');
+      const v = Number(item.v ?? item.value ?? item.y ?? item.close ?? item.metric ?? item.Kp ?? item.k_index ?? item.proton_speed ?? item.flux ?? item.views);
+      const t = String(item.t ?? item.time ?? item.date ?? item.timestamp ?? item.x ?? item.time_tag ?? item.dateTime ?? '');
       if (Number.isFinite(v)) return { t, v };
       return null;
     }).filter(Boolean);
     if (points.length) return { points, label, unit: '', source: 'JSON object array' };
   }
 
-  throw new Error('Could not extract a time series from JSON payload');
+  throw new Error('Could not extract a time series from JSON payload. Supported: NOAA SWPC GOES/Kp, USGS NWIS/GeoJSON, Wikimedia pageviews, World Bank, CoinGecko, Yahoo chart, iNaturalist, Alpha Vantage, or generic arrays.');
 }
 
 async function fetchAndAdapt(url) {
