@@ -147,21 +147,28 @@ async function fetchAndAdapt(url) {
 
   // Fallback: route through the backend proxy (handles CORS + User-Agent).
   // The backend has a /fetch-proxy?url=... endpoint that fetches server-side.
-  if (window.Groq && window.Groq.isConfigured()) {
-    // We piggyback on the BACKEND_URL by reading it from the Groq module.
-    // (Slight hack but avoids a second config knob.)
-    const backendUrl = window.Groq._backendUrl();
-    if (backendUrl) {
-      const proxyUrl = backendUrl + '/fetch-proxy?url=' + encodeURIComponent(url);
-      const r = await fetch(proxyUrl, { cache: 'no-store' });
-      if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url} (via proxy)`);
-      const text = await r.text();
-      const ct = (r.headers.get('content-type') || '').toLowerCase();
-      return parseByText(text, url, ct);
+  // We try to get the backend URL from window.Groq._backendUrl() if available,
+  // but fall back to reading it directly from the source if not (so a version
+  // mismatch between adapters.js and groq.js doesn't break everything).
+  let backendUrl = null;
+  try {
+    if (window.Groq && typeof window.Groq._backendUrl === 'function') {
+      backendUrl = window.Groq._backendUrl();
+    } else if (window.Groq && window.Groq._backendUrlRaw) {
+      backendUrl = window.Groq._backendUrlRaw;
     }
+  } catch (e) { /* ignore */ }
+
+  if (!backendUrl) {
+    throw new Error(`Cannot fetch ${url} — direct fetch failed (CORS or network) and backend proxy URL is not configured. To fix: push the latest public/assets/groq.js to your repo.`);
   }
 
-  throw new Error(`Cannot fetch ${url} — direct fetch failed (CORS or network) and no backend proxy configured. Try a different URL, or set BACKEND_URL in public/assets/groq.js.`);
+  const proxyUrl = backendUrl + '/fetch-proxy?url=' + encodeURIComponent(url);
+  const r = await fetch(proxyUrl, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url} (via proxy)`);
+  const text = await r.text();
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  return parseByText(text, url, ct);
 }
 
 function parseByText(text, url, ct) {
