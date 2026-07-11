@@ -212,6 +212,244 @@ function verdictFromFit(fit) {
   return 'FAILS';
 }
 
+// ── Classification models ─────────────────────────────────────────────────
+// Label: 0=DOWN, 1=FLAT, 2=UP (3-class) or 0=DOWN, 1=UP (2-class)
+function makeLabels(y, threshold = 0.001) {
+  return y.map(v => {
+    if (v > threshold) return 2;       // UP
+    if (v < -threshold) return 0;      // DOWN
+    return 1;                          // FLAT
+  });
+}
+
+// Logistic regression (binary: UP=1 vs DOWN=0, FLAT dropped for simplicity)
+function logisticFit(X, yBinary, lr = 0.01, epochs = 200) {
+  const n = X.length;
+  if (n === 0) return null;
+  const d = X[0].length;
+  // Standardize features
+  const xmean = new Array(d).fill(0);
+  const xstd = new Array(d).fill(0);
+  for (let i = 0; i < n; i++) for (let j = 0; j < d; j++) xmean[j] += X[i][j];
+  for (let j = 0; j < d; j++) xmean[j] /= n;
+  for (let i = 0; i < n; i++) for (let j = 0; j < d; j++) xstd[j] += (X[i][j] - xmean[j]) ** 2;
+  for (let j = 0; j < d; j++) xstd[j] = Math.sqrt(xstd[j] / n) || 1;
+  const Xs = X.map(row => row.map((v, j) => (v - xmean[j]) / xstd[j]));
+  let w = new Array(d).fill(0);
+  let b = 0;
+  for (let ep = 0; ep < epochs; ep++) {
+    const grad_w = new Array(d).fill(0);
+    let grad_b = 0;
+    for (let i = 0; i < n; i++) {
+      let z = b;
+      for (let j = 0; j < d; j++) z += w[j] * Xs[i][j];
+      const p = 1 / (1 + Math.exp(-z));
+      const err = p - yBinary[i];
+      for (let j = 0; j < d; j++) grad_w[j] += err * Xs[i][j];
+      grad_b += err;
+    }
+    for (let j = 0; j < d; j++) w[j] -= lr * grad_w[j] / n;
+    b -= lr * grad_b / n;
+  }
+  return { w, b, xmean, xstd };
+}
+function logisticPredict(model, x) {
+  if (!model) return 0.5;
+  let z = model.b;
+  for (let j = 0; j < model.w.length; j++) z += model.w[j] * ((x[j] - model.xmean[j]) / model.xstd[j]);
+  return 1 / (1 + Math.exp(-z));
+}
+
+// k-Nearest Neighbors (works for both classification and regression)
+function knnPredict(Xtrain, ytrain, x, k = 5, isClassification = true) {
+  const dists = Xtrain.map((xt, i) => {
+    let s = 0;
+    for (let j = 0; j < xt.length; j++) s += (xt[j] - x[j]) ** 2;
+    return { dist: Math.sqrt(s), idx: i };
+  }).sort((a, b) => a.dist - b.dist).slice(0, Math.min(k, Xtrain.length));
+  if (isClassification) {
+    const counts = {};
+    for (const d of dists) counts[ytrain[d.idx]] = (counts[ytrain[d.idx]] || 0) + 1;
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  } else {
+    return dists.reduce((s, d) => s + ytrain[d.idx], 0) / dists.length;
+  }
+}
+
+// Gaussian Naive Bayes (classification)
+function naiveBayesFit(X, y, nClasses = 3) {
+  const n = X.length;
+  const d = X[0].length;
+  const models = [];
+  for (let c = 0; c < nClasses; c++) {
+    const Xc = X.filter((_, i) => y[i] === c);
+    if (!Xc.length) { models.push(null); continue; }
+    const mean = new Array(d).fill(0);
+    const varr = new Array(d).fill(0);
+    for (let i = 0; i < Xc.length; i++) for (let j = 0; j < d; j++) mean[j] += Xc[i][j];
+    for (let j = 0; j < d; j++) mean[j] /= Xc.length;
+    for (let i = 0; i < Xc.length; i++) for (let j = 0; j < d; j++) varr[j] += (Xc[i][j] - mean[j]) ** 2;
+    for (let j = 0; j < d; j++) varr[j] = varr[j] / Xc.length + 1e-9;
+    models.push({ mean, varr, prior: Xc.length / n });
+  }
+  return models;
+}
+function naiveBayesPredict(models, x) {
+  let bestClass = 0, bestLogProb = -Infinity;
+  for (let c = 0; c < models.length; c++) {
+    if (!models[c]) continue;
+    let logProb = Math.log(models[c].prior);
+    for (let j = 0; j < x.length; j++) {
+      const m = models[c].mean[j], v = models[c].varr[j];
+      logProb += -0.5 * Math.log(2 * Math.PI * v) - (x[j] - m) ** 2 / (2 * v);
+    }
+    if (logProb > bestLogProb) { bestLogProb = logProb; bestClass = c; }
+  }
+  return bestClass;
+}
+
+// Classification metrics
+function classMetrics(yTrue, yPred, nClasses = 3) {
+  let correct = 0;
+  const cm = Array.from({ length: nClasses }, () => new Array(nClasses).fill(0));
+  for (let i = 0; i < yTrue.length; i++) {
+    cm[yTrue[i]][yPred[i]] = (cm[yTrue[i]][yPred[i]] || 0) + 1;
+    if (yTrue[i] === yPred[i]) correct++;
+  }
+  const accuracy = correct / yTrue.length;
+  // Per-class precision/recall/F1
+  const perClass = [];
+  for (let c = 0; c < nClasses; c++) {
+    let tp = cm[c][c], fp = 0, fn = 0;
+    for (let i = 0; i < nClasses; i++) {
+      if (i !== c) { fp += cm[i][c]; fn += cm[c][i]; }
+    }
+    const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+    const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+    const f1 = precision + recall > 0 ? 2 * precision * recall / (precision + recall) : 0;
+    perClass.push({ precision, recall, f1 });
+  }
+  return { accuracy, confusion: cm, perClass };
+}
+
+// Run all classification models
+function runClassification(values, horizon, useS2features = true) {
+  const n = values.length;
+  if (n < 60) throw new Error(`Need at least 60 points, got ${n}`);
+  const features = useS2features ? s2Features(values) : baselineFeatures(values);
+  const X = [], y = [];
+  for (let i = 0; i < n - horizon; i++) {
+    if (!features[i]) continue;
+    const v0 = values[i], vh = values[i + horizon];
+    if (v0 === 0 || !Number.isFinite(vh)) continue;
+    X.push(features[i]);
+    y.push((vh - v0) / v0);
+  }
+  if (X.length < 30) throw new Error('Not enough feature rows');
+  const split = Math.floor(X.length * 0.8);
+  const Xtrain = X.slice(0, split);
+  const ytrainRaw = y.slice(0, split);
+  const Xtest = X.slice(split);
+  const ytestRaw = y.slice(split);
+
+  const threshold = 0.001; // 0.1% return = FLAT
+  const ytrainLabels = makeLabels(ytrainRaw, threshold);
+  const ytestLabels = makeLabels(ytestRaw, threshold);
+  const nClasses = 3;
+
+  const results = {};
+
+  // 1. Logistic regression (binary: UP=1 vs not-UP=0)
+  const yBinary = ytrainLabels.map(l => l === 2 ? 1 : 0);
+  const yTestBinary = ytestLabels.map(l => l === 2 ? 1 : 0);
+  const lrModel = logisticFit(Xtrain, yBinary);
+  const lrPreds = Xtest.map(x => logisticPredict(lrModel, x) > 0.5 ? 2 : 0);
+  results.logistic = { ...classMetrics(ytestLabels, lrPreds, nClasses), predictions: lrPreds };
+
+  // 2. kNN classification (k=5)
+  const knnPreds = Xtest.map(x => Number(knnPredict(Xtrain, ytrainLabels, x, 5, true)));
+  results.knn = { ...classMetrics(ytestLabels, knnPreds, nClasses), predictions: knnPreds };
+
+  // 3. Naive Bayes
+  const nbModel = naiveBayesFit(Xtrain, ytrainLabels, nClasses);
+  const nbPreds = Xtest.map(x => naiveBayesPredict(nbModel, x));
+  results.naive_bayes = { ...classMetrics(ytestLabels, nbPreds, nClasses), predictions: nbPreds };
+
+  // 4. Majority-class baseline
+  const classCounts = {};
+  for (const l of ytrainLabels) classCounts[l] = (classCounts[l] || 0) + 1;
+  const majorityClass = Number(Object.entries(classCounts).sort((a, b) => b[1] - a[1])[0][0]);
+  const majPreds = Xtest.map(() => majorityClass);
+  results.majority = { ...classMetrics(ytestLabels, majPreds, nClasses), predictions: majPreds, majority_class: majorityClass };
+
+  // Next-step prediction (using the last available feature row)
+  const lastFeatRow = features.filter(Boolean).pop();
+  if (lastFeatRow) {
+    results.next_prediction = {
+      logistic: logisticPredict(lrModel, lastFeatRow) > 0.5 ? 'UP' : 'DOWN',
+      knn: ['DOWN', 'FLAT', 'UP'][Number(knnPredict(Xtrain, ytrainLabels, lastFeatRow, 5, true))],
+      naive_bayes: ['DOWN', 'FLAT', 'UP'][naiveBayesPredict(nbModel, lastFeatRow)],
+    };
+  }
+
+  return { horizon, threshold, n_test: Xtest.length, n_train: Xtrain.length, models: results };
+}
+
+// kNN regression
+function runKnnRegression(values, horizon, useS2features = true, k = 5) {
+  const n = values.length;
+  const features = useS2features ? s2Features(values) : baselineFeatures(values);
+  const X = [], y = [];
+  for (let i = 0; i < n - horizon; i++) {
+    if (!features[i]) continue;
+    const v0 = values[i], vh = values[i + horizon];
+    if (v0 === 0 || !Number.isFinite(vh)) continue;
+    X.push(features[i]);
+    y.push((vh - v0) / v0);
+  }
+  if (X.length < 30) throw new Error('Not enough rows');
+  const split = Math.floor(X.length * 0.8);
+  const Xtrain = X.slice(0, split);
+  const ytrain = y.slice(0, split);
+  const Xtest = X.slice(split);
+  const ytest = y.slice(split);
+  const preds = Xtest.map(x => knnPredict(Xtrain, ytrain, x, k, false));
+  let mae = 0, hitCount = 0;
+  for (let i = 0; i < preds.length; i++) {
+    mae += Math.abs(preds[i] - ytest[i]);
+    if (Math.sign(preds[i]) === Math.sign(ytest[i])) hitCount++;
+  }
+  mae = preds.length > 0 ? mae / preds.length : NaN;
+  const hitRate = preds.length > 0 ? hitCount / preds.length : NaN;
+  const lastFeatRow = features.filter(Boolean).pop();
+  const nextPred = lastFeatRow ? knnPredict(Xtrain, ytrain, lastFeatRow, k, false) : NaN;
+  return { horizon, next_return_prediction: nextPred, mae, hit_rate: hitRate, n_test: preds.length, n_train: split };
+}
+
+// Mean baseline regression (always predict the mean training return)
+function runMeanBaseline(values, horizon) {
+  const n = values.length;
+  const features = baselineFeatures(values);
+  const y = [];
+  for (let i = 0; i < n - horizon; i++) {
+    if (!features[i]) continue;
+    const v0 = values[i], vh = values[i + horizon];
+    if (v0 === 0 || !Number.isFinite(vh)) continue;
+    y.push((vh - v0) / v0);
+  }
+  if (y.length < 30) throw new Error('Not enough rows');
+  const split = Math.floor(y.length * 0.8);
+  const ytrain = y.slice(0, split);
+  const ytest = y.slice(split);
+  const meanReturn = ytrain.reduce((a, b) => a + b, 0) / ytrain.length;
+  let mae = 0, hitCount = 0;
+  for (let i = 0; i < ytest.length; i++) {
+    mae += Math.abs(meanReturn - ytest[i]);
+    if (Math.sign(meanReturn) === Math.sign(ytest[i])) hitCount++;
+  }
+  return { horizon, next_return_prediction: meanReturn, mae: mae / ytest.length, hit_rate: hitCount / ytest.length, n_test: ytest.length, n_train: split };
+}
+
 function rollingStats(values, windowSize = 20) {
   const out = [];
   for (let i = 0; i < values.length; i++) {
@@ -245,28 +483,41 @@ function analyzeSeries(points, label, unit, source) {
   const fit = fitS2(retention);
   const verdict = verdictFromFit(fit);
   const horizon = 5;
-  let ml = { horizon, model_next_return: null, baseline_next_return: null, model_hit_rate: null, baseline_hit_rate: null, n_test: 0 };
+  let ml = { horizon, regression: {}, classification: {} };
   try {
-    const modelPred = runPrediction(values, horizon, true);
-    const baselinePred = runPrediction(values, horizon, false);
-    ml = {
-      horizon,
-      model_next_return: modelPred.next_return_prediction,
-      model_hit_rate: modelPred.hit_rate,
-      model_mae: modelPred.mae,
-      model_testIdx: modelPred.testIdx,
-      model_testPreds: modelPred.testPreds,
-      model_testY: modelPred.testY,
-      baseline_next_return: baselinePred.next_return_prediction,
-      baseline_hit_rate: baselinePred.hit_rate,
-      baseline_mae: baselinePred.mae,
-      baseline_testPreds: baselinePred.testPreds,
-      baseline_testY: baselinePred.testY,
-      n_test: modelPred.n_test,
-      n_train: modelPred.n_train,
+    // Regression models
+    const ridgeS2 = runPrediction(values, horizon, true);
+    const ridgeBaseline = runPrediction(values, horizon, false);
+    const knnReg = runKnnRegression(values, horizon, true);
+    const meanBase = runMeanBaseline(values, horizon);
+    ml.regression = {
+      ridge_s2: { next_return: ridgeS2.next_return_prediction, hit_rate: ridgeS2.hit_rate, mae: ridgeS2.mae, n_test: ridgeS2.n_test },
+      ridge_baseline: { next_return: ridgeBaseline.next_return_prediction, hit_rate: ridgeBaseline.hit_rate, mae: ridgeBaseline.mae, n_test: ridgeBaseline.n_test },
+      knn: { next_return: knnReg.next_return_prediction, hit_rate: knnReg.hit_rate, mae: knnReg.mae, n_test: knnReg.n_test },
+      mean: { next_return: meanBase.next_return_prediction, hit_rate: meanBase.hit_rate, mae: meanBase.mae, n_test: meanBase.n_test },
+      // Keep old field names for backward compat with chart code
+      model_next_return: ridgeS2.next_return_prediction,
+      model_hit_rate: ridgeS2.hit_rate,
+      model_mae: ridgeS2.mae,
+      model_testIdx: ridgeS2.testIdx,
+      model_testPreds: ridgeS2.testPreds,
+      model_testY: ridgeS2.testY,
+      baseline_next_return: ridgeBaseline.next_return_prediction,
+      baseline_hit_rate: ridgeBaseline.hit_rate,
+      baseline_mae: ridgeBaseline.mae,
+      baseline_testPreds: ridgeBaseline.testPreds,
+      baseline_testY: ridgeBaseline.testY,
+      n_test: ridgeS2.n_test,
+      n_train: ridgeS2.n_train,
     };
   } catch (e) {
-    ml.error = e.message;
+    ml.regression.error = e.message;
+  }
+  try {
+    // Classification models
+    ml.classification = runClassification(values, horizon, true);
+  } catch (e) {
+    ml.classification.error = e.message;
   }
   const step = Math.max(1, Math.floor(values.length / 200));
   const raw_preview = [];
