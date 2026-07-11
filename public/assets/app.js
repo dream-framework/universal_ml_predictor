@@ -111,8 +111,10 @@ async function send() {
 
   // Step 1: parse + analyze (always works, no Groq needed)
   let analysis = null;
+  const feedLabel = state.pendingFeedLabel;
+  state.pendingFeedLabel = null;  // clear after capture
   try {
-    analysis = await runAnalysis(text, fileContent, fileName);
+    analysis = await runAnalysis(text, fileContent, fileName, feedLabel);
     if (analysis?.error) {
       appendMsg(`<p><b>Couldn't analyze:</b> ${esc(analysis.error)}</p>`, 'bot');
       state.busy = false;
@@ -158,14 +160,14 @@ async function send() {
   }
 }
 
-async function runAnalysis(text, fileContent, fileName) {
+async function runAnalysis(text, fileContent, fileName, feedLabel) {
   if (fileContent) {
     const lower = (fileName || '').toLowerCase();
     let parsed;
     if (lower.endsWith('.json') || fileContent.trim().startsWith('{') || fileContent.trim().startsWith('[')) {
-      parsed = window.Adapters.seriesFromJSON(fileContent, fileName);
+      parsed = window.Adapters.seriesFromJSON(fileContent, feedLabel || fileName);
     } else {
-      parsed = window.Adapters.seriesFromCSV(fileContent, fileName);
+      parsed = window.Adapters.seriesFromCSV(fileContent, feedLabel || fileName);
     }
     return window.Engine.analyzeSeries(parsed.points, parsed.label, parsed.unit, parsed.source);
   }
@@ -173,8 +175,9 @@ async function runAnalysis(text, fileContent, fileName) {
   const urlMatch = (text || '').match(/https?:\/\/[^\s<>"']+/i);
   if (urlMatch) {
     const url = urlMatch[0];
-    appendMsg(`<p class="muted">Fetching ${esc(url)}…</p>`, 'bot');
-    const parsed = await window.Adapters.fetchAndAdapt(url);
+    const label = feedLabel || url;  // use feed label if available, else URL
+    appendMsg(`<p class="muted">Fetching ${esc(label === url ? url : label)}…</p>`, 'bot');
+    const parsed = await window.Adapters.fetchAndAdapt(url, label);
     return window.Engine.analyzeSeries(parsed.points, parsed.label, parsed.unit, parsed.source);
   }
   // Free chat — no analysis
@@ -742,6 +745,9 @@ async function loadFeeds() {
         $('feedSelect').focus();
         return;
       }
+      const feed = state.feeds.find(f => f.url === sel.value);
+      // Store the feed label so send() can pass it to runAnalysis
+      state.pendingFeedLabel = feed ? feed.label : null;
       $('chatInput').value = sel.value;
       $('chatInput').focus();
       // Trigger autosend so user doesn't have to click Send
