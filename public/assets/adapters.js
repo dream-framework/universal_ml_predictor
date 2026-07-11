@@ -205,7 +205,7 @@ function seriesFromJSON(text, label = 'JSON upload') {
   throw new Error('Could not extract a time series from JSON payload. Supported: NOAA SWPC GOES/Kp, USGS NWIS/GeoJSON, Wikimedia pageviews, World Bank, CoinGecko, Yahoo chart, iNaturalist, Alpha Vantage, or generic arrays.');
 }
 
-async function fetchAndAdapt(url) {
+async function fetchAndAdapt(url, label) {
   // Try direct first (works for CORS-open sources: USGS, NOAA, CoinGecko, etc.)
   try {
     const r = await fetch(url, { cache: 'no-store', redirect: 'follow' });
@@ -213,7 +213,7 @@ async function fetchAndAdapt(url) {
       const ct = (r.headers.get('content-type') || '').toLowerCase();
       const text = await r.text();
       try {
-        return parseByText(text, url, ct);
+        return parseByText(text, url, ct, label);
       } catch (e) {
         // fall through to proxy
       }
@@ -245,18 +245,19 @@ async function fetchAndAdapt(url) {
   if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${url} (via proxy)`);
   const text = await r.text();
   const ct = (r.headers.get('content-type') || '').toLowerCase();
-  return parseByText(text, url, ct);
+  return parseByText(text, url, ct, label);
 }
 
-function parseByText(text, url, ct) {
+function parseByText(text, url, ct, label) {
+  const useLabel = label || url;
   if (ct.includes('json') || url.endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
-    return seriesFromJSON(text, url);
+    return seriesFromJSON(text, useLabel);
   }
   if (ct.includes('csv') || ct.includes('text') || url.endsWith('.csv') || url.endsWith('.tsv') || url.endsWith('.txt')) {
-    return seriesFromCSV(text, url);
+    return seriesFromCSV(text, useLabel);
   }
-  try { return seriesFromJSON(text, url); }
-  catch { return seriesFromCSV(text, url); }
+  try { return seriesFromJSON(text, useLabel); }
+  catch { return seriesFromCSV(text, useLabel); }
 }
 
 return { fetchAndAdapt, seriesFromCSV, seriesFromJSON };
