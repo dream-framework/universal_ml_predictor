@@ -207,6 +207,8 @@ function seriesFromJSON(text, label = 'JSON upload') {
 
 async function fetchAndAdapt(url, label) {
   // Try direct first (works for CORS-open sources: USGS, NOAA, CoinGecko, etc.)
+  let directFetchError = null;
+  let parseError = null;
   try {
     const r = await fetch(url, { cache: 'no-store', redirect: 'follow' });
     if (r.ok) {
@@ -215,18 +217,26 @@ async function fetchAndAdapt(url, label) {
       try {
         return parseByText(text, url, ct, label);
       } catch (e) {
-        // fall through to proxy
+        parseError = e;  // fetch worked but parsing failed — save the real error
       }
+    } else {
+      directFetchError = new Error(`HTTP ${r.status} from ${url}`);
     }
   } catch (e) {
-    // CORS or network error — fall through to proxy
+    directFetchError = e;  // CORS or network error
   }
 
-  // Fallback: route through the backend proxy (handles CORS + User-Agent).
-  // The backend has a /fetch-proxy?url=... endpoint that fetches server-side.
-  // We try to get the backend URL from window.Groq._backendUrl() if available,
-  // but fall back to reading it directly from the source if not (so a version
-  // mismatch between adapters.js and groq.js doesn't break everything).
+  // If direct fetch worked but parsing failed, throw the parse error directly
+  // (don't try the proxy — the proxy will return the same data and parsing will
+  // fail the same way).
+  if (parseError) throw parseError;
+
+  // If direct fetch failed with a non-OK status (not CORS), throw that error
+  if (directFetchError && !directFetchError.message.includes('Failed to fetch') && !directFetchError.message.includes('CORS')) {
+    throw directFetchError;
+  }
+
+  // Direct fetch failed with a CORS/network error — try the backend proxy
   let backendUrl = null;
   try {
     if (window.Groq && typeof window.Groq._backendUrl === 'function') {
@@ -237,7 +247,7 @@ async function fetchAndAdapt(url, label) {
   } catch (e) { /* ignore */ }
 
   if (!backendUrl) {
-    throw new Error(`Cannot fetch ${url} — direct fetch failed (CORS or network) and backend proxy URL is not configured. To fix: push the latest public/assets/groq.js to your repo.`);
+    throw new Error(`Cannot fetch ${url} — direct fetch failed (${directFetchError?.message || 'unknown error'}) and backend proxy URL is not configured.`);
   }
 
   const proxyUrl = backendUrl + '/fetch-proxy?url=' + encodeURIComponent(url);
