@@ -161,6 +161,22 @@ STYLE — DETAILED BUT LACONIC:
       // its explanation; the full arrays stay in the browser for charts.
       const s = analysis?.series || {};
       const ml = analysis?.ml || {};
+      const reg = ml.regression || {};
+      const cls = ml.classification || {};
+
+      // Build classification summary (just model names + accuracies + next pred)
+      const clsSummary = cls.error ? { error: cls.error } : {
+        n_test: cls.n_test,
+        n_train: cls.n_train,
+        models: cls.models ? {
+          logistic: { accuracy: cls.models.logistic?.accuracy },
+          knn: { accuracy: cls.models.knn?.accuracy },
+          naive_bayes: { accuracy: cls.models.naive_bayes?.accuracy },
+          majority: { accuracy: cls.models.majority?.accuracy, majority_class: ['DOWN','FLAT','UP'][cls.models.majority?.majority_class ?? 1] },
+        } : null,
+        next_prediction: cls.models?.next_prediction,
+      };
+
       const slim = {
         series: {
           label: s.label,
@@ -175,20 +191,20 @@ STYLE — DETAILED BUT LACONIC:
         verdict: analysis?.verdict,
         ml: {
           horizon: ml.horizon,
-          model_next_return: ml.model_next_return,
-          model_hit_rate: ml.model_hit_rate,
-          model_mae: ml.model_mae,
-          baseline_next_return: ml.baseline_next_return,
-          baseline_hit_rate: ml.baseline_hit_rate,
-          baseline_mae: ml.baseline_mae,
-          n_test: ml.n_test,
-          n_train: ml.n_train,
-          error: ml.error,
+          regression: reg.error ? { error: reg.error } : {
+            ridge_s2: { hit_rate: reg.ridge_s2?.hit_rate, next_return: reg.ridge_s2?.next_return },
+            ridge_baseline: { hit_rate: reg.ridge_baseline?.hit_rate },
+            knn: { hit_rate: reg.knn?.hit_rate },
+            mean: { hit_rate: reg.mean?.hit_rate },
+            n_test: reg.n_test,
+            n_train: reg.n_train,
+          },
+          classification: clsSummary,
         },
       };
       messages = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `The user said: "${message || ''}"\n\nI fetched and analyzed their data. Here are the results:\n\n${JSON.stringify(slim, null, 2)}\n\nExplain these results to the user in plain English. Be specific about the numbers. Use the words 'structured', 'mixed', or 'noisy' — never the internal codes. If our model beats baseline, mention it. If not, mention that honestly. Never mention S2, stretched exponential, retention curve, D, or lambda.` },
+        { role: 'user', content: `The user said: "${message || ''}"\n\nI fetched and analyzed their data. Here are the results:\n\n${JSON.stringify(slim, null, 2)}\n\nExplain these results to the user in plain English. Be specific about the numbers. Use the words 'structured', 'mixed', or 'noisy' — never the internal codes. Cover BOTH regression (hit rates — how often the predicted direction matches the actual direction) AND classification (accuracy — how often the model correctly predicts UP/DOWN/FLAT). Name the best-performing model in each category. If no model beats the baseline, say so honestly. Never mention S2, stretched exponential, retention curve, D, or lambda.` },
       ];
     }
 
