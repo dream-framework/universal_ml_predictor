@@ -10,7 +10,8 @@ const state = {
   history: [],
   analysis: null,
   activeTab: 'series',
-  charts: {},  // tab-name -> echarts instance
+  charts: {},  // tab-name -> echarts instance (dashboard)
+  fsChart: null,  // fullscreen chart instance
 };
 
 const VERDICT_LABELS = {
@@ -286,42 +287,81 @@ function commonChartOpts(includeZoom = true) {
   return opts;
 }
 
-// ── Fullscreen toggle ─────────────────────────────────────────────────────
+// ── Fullscreen overlay (separate chart instance, no DOM moving) ───────────
 let _isFullscreen = false;
-let _preFullscreenParent = null;
-let _preFullscreenStyle = '';
+function ensureFsOverlay() {
+  let overlay = $('fsOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'fsOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#07091a;display:none;padding:24px;';
+    overlay.innerHTML = `
+      <div id="fsChartHost" style="width:100%;height:100%;"></div>
+      <button id="fsExit" type="button" style="position:fixed;top:16px;right:16px;z-index:10000;background:#60a5fa;color:#0a0f1d;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13px;">× Exit fullscreen</button>
+      <div id="fsTabs" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:10000;display:flex;gap:4px;background:rgba(11,18,32,0.85);padding:6px;border-radius:10px;border:1px solid #2d3a52;"></div>
+    `;
+    document.body.appendChild(overlay);
+    $('fsExit').onclick = () => toggleFullscreen();
+    // Build tab buttons in the overlay (mirrors dashboard tabs)
+    const tabs = [
+      ['series', '📈 Series'],
+      ['predictions', '🎯 Predictions'],
+      ['matchup', '⚖ Match-up'],
+      ['rolling', '📊 Rolling'],
+      ['phase', '🌌 Phase'],
+    ];
+    const fsTabs = $('fsTabs');
+    tabs.forEach(([key, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.fstab = key;
+      b.textContent = label;
+      b.style.cssText = 'background:transparent;color:#8b97ad;border:none;padding:6px 10px;cursor:pointer;font-size:12px;font-family:inherit;border-radius:6px;';
+      b.onclick = () => {
+        state.activeTab = key;
+        // Sync the dashboard tabs too (so when we exit, dashboard shows the same tab)
+        document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dash === key));
+        renderActiveTab();
+        renderFsTab();
+      };
+      fsTabs.appendChild(b);
+    });
+  }
+  return overlay;
+}
+
+function renderFsTab() {
+  if (!_isFullscreen) return;
+  if (!state.analysis) return;
+  if (!state.fsChart) state.fsChart = echarts.init($('fsChartHost'));
+  state.fsChart.clear();
+  const tab = state.activeTab;
+  // Reuse the same render functions but with the fs chart instance
+  if (tab === 'series') renderSeriesTab(state.fsChart);
+  else if (tab === 'predictions') renderPredictionsTab(state.fsChart);
+  else if (tab === 'matchup') renderMatchupTab(state.fsChart);
+  else if (tab === 'rolling') renderRollingTab(state.fsChart);
+  else if (tab === 'phase') renderPhaseTab(state.fsChart);
+  // Highlight the active tab button
+  document.querySelectorAll('#fsTabs button').forEach(b => {
+    const active = b.dataset.fstab === tab;
+    b.style.color = active ? '#60a5fa' : '#8b97ad';
+    b.style.background = active ? 'rgba(96,165,250,0.15)' : 'transparent';
+  });
+}
+
 function toggleFullscreen() {
-  const host = $('chartHost');
-  if (!host) return;
+  const overlay = ensureFsOverlay();
   if (!_isFullscreen) {
-    // Enter fullscreen: detach chart host, append to body with fixed styling
-    _preFullscreenParent = host.parentNode;
-    _preFullscreenStyle = host.getAttribute('style') || '';
-    host.setAttribute('style', 'position:fixed;inset:0;z-index:9999;background:#07091a;width:100vw;height:100vh;padding:24px;');
-    document.body.appendChild(host);
-    // Add an exit button overlay
-    const exit = document.createElement('button');
-    exit.id = 'chartExitFs';
-    exit.setAttribute('style', 'position:fixed;top:16px;right:16px;z-index:10000;background:#60a5fa;color:#0a0f1d;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;');
-    exit.textContent = '× Exit fullscreen';
-    exit.onclick = () => toggleFullscreen();
-    document.body.appendChild(exit);
+    if (!state.analysis) return;  // nothing to show
+    overlay.style.display = 'block';
     _isFullscreen = true;
+    renderFsTab();
+    setTimeout(() => { if (state.fsChart) state.fsChart.resize(); }, 60);
   } else {
-    // Exit fullscreen
-    if (_preFullscreenParent) {
-      _preFullscreenParent.appendChild(host);
-      host.setAttribute('style', _preFullscreenStyle);
-    }
-    const exit = $('chartExitFs');
-    if (exit) exit.remove();
+    overlay.style.display = 'none';
     _isFullscreen = false;
   }
-  // Resize the active chart after a tick so it fills the new container
-  setTimeout(() => {
-    const activeChart = state.charts[state.activeTab];
-    if (activeChart) activeChart.resize();
-  }, 50);
 }
 
 function renderSeriesTab(chart) {
@@ -511,6 +551,160 @@ function wireTabs() {
   });
 }
 
+// ── Reset chat + dashboard ────────────────────────────────────────────────
+function resetChat() {
+  if (!confirm('Reset chat and dashboard? Current analysis will be cleared.')) return;
+  state.history = [];
+  state.analysis = null;
+  state.activeTab = 'series';
+  state.charts = {};
+  if (state.fsChart) { state.fsChart.clear(); }
+  // Restore welcome message
+  $('messages').innerHTML = `
+    <div class="msg bot">
+      <div class="avatar">●</div>
+      <div class="bubble">
+        <p>Hi! Paste a link to a CSV or JSON file, or drop one in the box below. I'll read it, run the analysis, and the dashboard on the right will light up.</p>
+        <p>Good examples to try:</p>
+        <ul>
+          <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code></li>
+          <li><code>https://query2.finance.yahoo.com/v8/finance/chart/^GSPC?range=2y&interval=1d</code></li>
+          <li>Any CSV with a date column and a numeric column</li>
+        </ul>
+        <p class="muted">The bot uses a shared key on the backend — just paste a URL or drop a file to get started.</p>
+      </div>
+    </div>`;
+  // Reset dashboard tabs to Series
+  document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dash === 'series'));
+  // Clear dashboard
+  $('dashboard').innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <p>No data yet. Paste a URL or drop a file to populate the dashboard.</p>
+    </div>`;
+  $('chatInput').value = '';
+  $('chatInput').style.height = 'auto';
+  $('chatInput').focus();
+}
+
+// ── Save current analysis to GitHub registry ──────────────────────────────
+async function saveToRegistry() {
+  if (!state.analysis) {
+    appendMsg(`<p class="muted">Run an analysis first — nothing to save yet.</p>`, 'bot');
+    return;
+  }
+  if (!window.Registry.isConfigured()) {
+    openRegistryModal();
+    return;
+  }
+  try {
+    $('saveBtn').disabled = true;
+    $('saveBtn').textContent = '⤓ Saving…';
+    const userMsg = state.history.filter(h => h.role === 'user').slice(-1)[0]?.content || '';
+    const result = await window.Registry.save(state.analysis, userMsg);
+    appendMsg(`<p class="muted">Saved to registry: <code>${esc(result.path)}</code></p>`, 'bot');
+  } catch (err) {
+    appendMsg(`<p><b>Save failed:</b> ${esc(err.message)}</p>`, 'bot');
+  } finally {
+    $('saveBtn').disabled = false;
+    $('saveBtn').textContent = '⤓ Save to registry';
+  }
+}
+
+// ── History modal ─────────────────────────────────────────────────────────
+async function openHistoryModal() {
+  $('historyModal').classList.add('show');
+  $('historyList').innerHTML = '<div class="empty">Loading…</div>';
+  if (!window.Registry.isConfigured()) {
+    $('historyList').innerHTML = '<div class="empty">Registry not configured. Click "Save to registry" to set it up.</div>';
+    return;
+  }
+  try {
+    const items = await window.Registry.list();
+    if (!items.length) {
+      $('historyList').innerHTML = '<div class="empty">No saved analyses yet. Run an analysis, then click "Save to registry".</div>';
+      return;
+    }
+    $('historyList').innerHTML = items.map(item => {
+      const ts = item.name.replace('.json', '').replace(/-/g, (m, i) => i > 9 ? (i === 10 ? 'T' : ':') : '-');
+      return `
+        <div class="history-item" data-path="${esc(item.path)}" data-sha="${esc(item.sha)}">
+          <div class="h-meta">
+            <div class="h-title">${esc(item.name)}</div>
+            <div class="h-sub">${esc(item.path)}</div>
+          </div>
+          <div class="h-stats">
+            <div class="h-stat"><span>size</span><b>${(item.size / 1024).toFixed(1)} KB</b></div>
+          </div>
+          <button class="h-del" data-del="1" title="Delete">×</button>
+        </div>`;
+    }).join('');
+    // Wire clicks
+    document.querySelectorAll('.history-item').forEach(el => {
+      el.addEventListener('click', async (e) => {
+        if (e.target.dataset.del) return;
+        const item = { path: el.dataset.path, sha: el.dataset.sha, name: el.querySelector('.h-title').textContent };
+        await loadFromRegistry(item);
+      });
+    });
+    document.querySelectorAll('.h-del').forEach(b => {
+      b.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const el = b.closest('.history-item');
+        const item = { path: el.dataset.path, sha: el.dataset.sha, name: el.querySelector('.h-title').textContent };
+        if (!confirm(`Delete ${item.name}?`)) return;
+        try {
+          await window.Registry.remove(item);
+          el.remove();
+        } catch (err) {
+          alert('Delete failed: ' + err.message);
+        }
+      });
+    });
+  } catch (err) {
+    $('historyList').innerHTML = `<div class="empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+async function loadFromRegistry(item) {
+  try {
+    $('historyList').innerHTML = '<div class="empty">Loading…</div>';
+    const payload = await window.Registry.load(item);
+    if (!payload.analysis) throw new Error('Saved file has no analysis field.');
+    state.analysis = payload.analysis;
+    state.history = payload.user_message ? [{ role: 'user', content: payload.user_message }] : [];
+    // Close modal
+    $('historyModal').classList.remove('show');
+    // Render dashboard + summary
+    $('messages').innerHTML = '';
+    const v = VERDICT_LABELS[state.analysis.verdict] || { text: '—', cls: 'warn' };
+    const ml = state.analysis.ml || {};
+    const diff = (Number.isFinite(ml.model_hit_rate) && Number.isFinite(ml.baseline_hit_rate))
+      ? (ml.model_hit_rate - ml.baseline_hit_rate) * 100 : null;
+    const diffStr = diff === null ? '' : (diff >= 0 ? ` Our model beats baseline by ${diff.toFixed(1)} pp.` : ` Our model underperforms baseline by ${(-diff).toFixed(1)} pp.`);
+    appendMsg(`<p class="muted">Loaded from registry: <code>${esc(item.name)}</code></p>`, 'bot');
+    appendMsg(`<p><b>${state.analysis.series.n_points}</b> points from <b>${esc(state.analysis.series.label || '')}</b>. Signal: <b>${esc(v.text)}</b> (fit quality ${pct(state.analysis.fit.r2, 1)}).${diffStr} Dashboard updated.</p>`, 'bot');
+    renderDashboard();
+    // Reset to series tab
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dash === 'series'));
+    state.activeTab = 'series';
+    renderActiveTab();
+  } catch (err) {
+    $('historyList').innerHTML = `<div class="empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+// ── Registry settings modal ───────────────────────────────────────────────
+function openRegistryModal() {
+  $('regRepoInput').value = window.Registry.getRepo();
+  $('regTokenInput').value = window.Registry.getToken();
+  $('regBranchInput').value = window.Registry.getBranch();
+  $('registryModal').classList.add('show');
+}
+function closeRegistryModal() {
+  $('registryModal').classList.remove('show');
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 function init() {
   wireDropzone();
@@ -523,17 +717,47 @@ function init() {
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(140, e.target.scrollHeight) + 'px';
   });
+
+  // Reset / Save / History buttons
+  $('resetBtn').addEventListener('click', resetChat);
+  $('saveBtn').addEventListener('click', saveToRegistry);
+  $('historyBtn').addEventListener('click', openHistoryModal);
+  $('historyClose').addEventListener('click', () => $('historyModal').classList.remove('show'));
+  $('historyModal').addEventListener('click', (e) => { if (e.target.id === 'historyModal') $('historyModal').classList.remove('show'); });
+
+  // Registry settings modal
+  $('registrySave').addEventListener('click', () => {
+    window.Registry.setRepo($('regRepoInput').value.trim());
+    window.Registry.setToken($('regTokenInput').value.trim());
+    window.Registry.setBranch($('regBranchInput').value.trim() || 'main');
+    window.Registry.refreshStatus();
+    closeRegistryModal();
+  });
+  $('registryClear').addEventListener('click', () => {
+    $('regRepoInput').value = '';
+    $('regTokenInput').value = '';
+    $('regBranchInput').value = '';
+    window.Registry.setRepo('');
+    window.Registry.setToken('');
+    window.Registry.setBranch('main');
+    window.Registry.refreshStatus();
+  });
+  $('registryClose').addEventListener('click', closeRegistryModal);
+  $('registryModal').addEventListener('click', (e) => { if (e.target.id === 'registryModal') closeRegistryModal(); });
+
   window.addEventListener('resize', () => {
     Object.values(state.charts).forEach(c => c && c.resize());
+    if (state.fsChart) state.fsChart.resize();
   });
-  // Esc exits fullscreen chart
+  // Esc exits fullscreen chart OR closes modals
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && _isFullscreen) {
-      e.preventDefault();
-      toggleFullscreen();
-    }
+    if (e.key !== 'Escape') return;
+    if (_isFullscreen) { e.preventDefault(); toggleFullscreen(); }
+    else if ($('historyModal').classList.contains('show')) { $('historyModal').classList.remove('show'); }
+    else if ($('registryModal').classList.contains('show')) { closeRegistryModal(); }
   });
   refreshStatus();
+  window.Registry.refreshStatus();
 }
 
 init();
