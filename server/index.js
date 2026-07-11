@@ -50,36 +50,63 @@ app.get('/health', (req, res) => {
 // Some sources (Yahoo Finance, etc.) block browser fetches via CORS or
 // require a User-Agent. The browser calls this endpoint with ?url=...;
 // we fetch server-side with a real UA and return the body with CORS headers.
+//
+// Fallback chain: direct fetch → allorigins.win proxy → give up.
 app.get('/fetch-proxy', async (req, res) => {
   let url = req.query.url;
   if (!url) return res.status(400).json({ error: 'Missing ?url= parameter' });
-  // Safety: only allow http(s)
   if (!/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'URL must start with http:// or https://' });
 
   // Yahoo Finance: query1 is heavily rate-limited; query2 usually works.
-  // Auto-rewrite query1 → query2 so users pasting either URL get data.
   url = url.replace('query1.finance.yahoo.com', 'query2.finance.yahoo.com');
 
+  const fetchOpts = {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json,text/csv,text/plain,*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    redirect: 'follow',
+  };
+
+  // Tier 1: direct fetch
   try {
-    const r = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json,text/csv,text/plain,*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      redirect: 'follow',
-    });
-    if (!r.ok) {
-      return res.status(r.status).json({ error: `Upstream returned HTTP ${r.status} for ${url}` });
+    const r = await fetch(url, fetchOpts);
+    if (r.ok) {
+      const text = await r.text();
+      const ct = r.headers.get('content-type') || 'text/plain';
+      res.set('Content-Type', ct);
+      return res.send(text);
     }
-    const text = await r.text();
-    // Pass through content-type so the browser parser picks the right adapter
-    const ct = r.headers.get('content-type') || 'text/plain';
-    res.set('Content-Type', ct);
-    res.send(text);
-  } catch (err) {
-    res.status(502).json({ error: `Proxy fetch failed: ${err.message}` });
+    // 429/403/etc — fall through to tier 2
+  } catch (e) {
+    // network error — fall through to tier 2
   }
+
+  // Tier 2: allorigins.win (free CORS proxy, fetches server-side).
+  // It's flaky (50% success rate per attempt), so retry up to 4 times.
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+      const r = await fetch(proxyUrl, { redirect: 'follow' });
+      if (r.ok) {
+        const text = await r.text();
+        if (text && !text.includes('500 Internal Server Error') && !text.includes('error code: 5')) {
+          let ct = 'text/plain';
+          if (url.endsWith('.json') || url.includes('/chart/') || text.trim().startsWith('{') || text.trim().startsWith('[')) ct = 'application/json';
+          else if (url.endsWith('.csv') || url.endsWith('.tsv')) ct = 'text/csv';
+          res.set('Content-Type', ct);
+          return res.send(text);
+        }
+      }
+      // 5xx or empty — retry
+    } catch (e) {
+      // network error — retry
+    }
+    if (attempt < 4) await new Promise(r => setTimeout(r, 500 * attempt));  // backoff
+  }
+
+  return res.status(502).json({ error: `Could not fetch ${url} after 4 attempts (direct + allorigins proxy). The source may be down or blocking.` });
 });
 
 // ── Main endpoint ─────────────────────────────────────────────────────────
