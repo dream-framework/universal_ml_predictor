@@ -142,6 +142,21 @@ body {
 
 /* ═══ CHAT COMPOSER ─═════════════════════════════════════════════════ */
 .composer { border-top: 1px solid var(--line); padding: 10px 12px 12px; background: var(--panel2); flex-shrink: 0; }
+.feed-picker {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px; padding-bottom: 8px;
+  border-bottom: 1px dashed var(--line);
+  flex-wrap: wrap;
+}
+.feed-picker label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; }
+.feed-picker select {
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--line2); padding: 5px 10px;
+  border-radius: 6px; font-size: 12px; font-family: inherit;
+  max-width: 320px;
+}
+.feed-picker select:focus { outline: none; border-color: var(--accent); }
+.feed-desc { color: var(--muted); font-size: 10.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dropzone {
   border: 1px dashed var(--line2); border-radius: 8px; padding: 8px;
   text-align: center; cursor: pointer; margin-bottom: 8px;
