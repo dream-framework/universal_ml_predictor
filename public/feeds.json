@@ -10,6 +10,13 @@
       "n_points_estimate": 720
     },
     {
+      "label": "🌊 USGS Potomac River flow (30 days, 5-min)",
+      "domain": "geophysical",
+      "url": "https://waterservices.usgs.gov/nwis/iv/?sites=01646500&parameterCd=00060&startDT=2026-06-11&endDT=2026-07-11&format=json",
+      "description": "Potomac River discharge at Point of Rocks, MD. ~8,600 points at 5-min cadence. CORS-open, no key.",
+      "n_points_estimate": 8600
+    },
+    {
       "label": "₿ Bitcoin daily closes (1 year, CoinGecko)",
       "domain": "crypto",
       "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",
@@ -24,7 +31,35 @@
       "n_points_estimate": 366
     },
     {
-      "label": "☀️ NOAA solar wind speed (real-time, 1-min)",
+      "label": "☀️ NOAA GOES X-ray flux (6 hours, 1-min)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json",
+      "description": "GOES satellite X-ray flux at 1-min cadence, last 6 hours. ~360 points. CORS-open, no key.",
+      "n_points_estimate": 360
+    },
+    {
+      "label": "🧲 NOAA GOES magnetometer (6 hours, 1-min)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json",
+      "description": "GOES magnetometer (Hp component) at 1-min cadence, last 6 hours. ~360 points. CORS-open, no key.",
+      "n_points_estimate": 360
+    },
+    {
+      "label": "⚡ NOAA GOES ≥2MeV electrons (6 hours)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-6-hour.json",
+      "description": "GOES integral electron flux ≥2 MeV, last 6 hours. ~70 points. CORS-open, no key.",
+      "n_points_estimate": 70
+    },
+    {
+      "label": "🚀 NOAA GOES ≥10MeV protons (6 hours)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json",
+      "description": "GOES integral proton flux ≥10 MeV, last 6 hours. ~570 points. CORS-open, no key.",
+      "n_points_estimate": 570
+    },
+    {
+      "label": "🌬️ NOAA solar wind speed (real-time, 1-min)",
       "domain": "space_weather",
       "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
       "description": "Real-time solar wind proton speed from NOAA SWPC. ~3,000 points (last 2 days at 1-min cadence). CORS-open, no key.",
@@ -38,12 +73,33 @@
       "n_points_estimate": 1000
     },
     {
-      "label": "🌐 NOAA GOES X-ray flux (6-hour, real-time)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json",
-      "description": "GOES satellite X-ray flux at 1-min cadence for last 6 hours. ~360 points. CORS-open, no key.",
-      "n_points_estimate": 360
+      "label": "📖 Wikimedia 'Earth' pageviews (daily, 2.5 years)",
+      "domain": "society",
+      "url": "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Earth/daily/20240101/20260711",
+      "description": "Daily pageview counts for the Wikipedia 'Earth' article. ~920 points back to Jan 2024. CORS-open, no key.",
+      "n_points_estimate": 920
+    },
+    {
+      "label": "🏦 World Bank USA GDP (annual, 65 years)",
+      "domain": "economic",
+      "url": "https://api.worldbank.org/v2/country/USA/indicator/NY.GDP.MKTP.CD?format=json&per_page=100",
+      "description": "US GDP in current USD, annual. ~65 points back to 1960. CORS-open, no key.",
+      "n_points_estimate": 65
+    },
+    {
+      "label": "💰 World Bank USA CPI (annual, 65 years)",
+      "domain": "economic",
+      "url": "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL?format=json&per_page=100",
+      "description": "US Consumer Price Index, annual. ~65 points back to 1960. CORS-open, no key.",
+      "n_points_estimate": 65
+    },
+    {
+      "label": "📉 World Bank USA Unemployment (annual, 35 years)",
+      "domain": "economic",
+      "url": "https://api.worldbank.org/v2/country/USA/indicator/SL.UEM.TOTL.ZS?format=json&per_page=100",
+      "description": "US unemployment rate, annual. ~35 points back to 1991. CORS-open, no key.",
+      "n_points_estimate": 35
     }
   ],
-  "notes": "All feeds are CORS-open (work direct from browser, no proxy needed) and require no API key. FRED CSV feeds were removed because FRED doesn't send CORS headers and free CORS proxies are unreliable. To add FRED back, set up a dedicated proxy. To add more CoinGecko coins, change the 'bitcoin' or 'ethereum' path segment in the URL."
+  "notes": "All feeds are CORS-open (work direct from browser, no proxy needed) and require no API key. Sources match the DREAM retention page (https://dream-physics.onrender.com/retention). To add more CoinGecko coins, change the 'bitcoin' or 'ethereum' path segment. To add more World Bank indicators, change the indicator code (e.g. NY.GDP.MKTP.CD for GDP, FP.CPI.TOTL for CPI)."
 }
