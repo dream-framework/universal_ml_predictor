@@ -83,30 +83,34 @@ app.get('/fetch-proxy', async (req, res) => {
     // network error — fall through to tier 2
   }
 
-  // Tier 2: allorigins.win (free CORS proxy, fetches server-side).
-  // It's flaky (50% success rate per attempt), so retry up to 4 times.
-  for (let attempt = 1; attempt <= 4; attempt++) {
-    try {
-      const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-      const r = await fetch(proxyUrl, { redirect: 'follow' });
-      if (r.ok) {
-        const text = await r.text();
-        if (text && !text.includes('500 Internal Server Error') && !text.includes('error code: 5')) {
-          let ct = 'text/plain';
-          if (url.endsWith('.json') || url.includes('/chart/') || text.trim().startsWith('{') || text.trim().startsWith('[')) ct = 'application/json';
-          else if (url.endsWith('.csv') || url.endsWith('.tsv')) ct = 'text/csv';
-          res.set('Content-Type', ct);
-          return res.send(text);
+  // Tier 2: try multiple free CORS proxies in sequence.
+  // allorigins is flaky (~50% success per attempt), so retry + try alternatives.
+  const proxies = [
+    (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+    (u) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(u),
+    (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  ];
+  for (let pi = 0; pi < proxies.length; pi++) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const proxyUrl = proxies[pi](url);
+        const r = await fetch(proxyUrl, { redirect: 'follow' });
+        if (r.ok) {
+          const text = await r.text();
+          if (text && text.length > 20 && !text.includes('500 Internal Server Error') && !text.includes('error code: 5') && !text.includes('Request Timeout')) {
+            let ct = 'text/plain';
+            if (url.endsWith('.json') || url.includes('/chart/') || text.trim().startsWith('{') || text.trim().startsWith('[')) ct = 'application/json';
+            else if (url.endsWith('.csv') || url.endsWith('.tsv') || text.includes(',')) ct = 'text/csv';
+            res.set('Content-Type', ct);
+            return res.send(text);
+          }
         }
-      }
-      // 5xx or empty — retry
-    } catch (e) {
-      // network error — retry
+      } catch (e) { /* try next */ }
+      if (attempt < 2) await new Promise(r => setTimeout(r, 300 * attempt));
     }
-    if (attempt < 4) await new Promise(r => setTimeout(r, 500 * attempt));  // backoff
   }
 
-  return res.status(502).json({ error: `Could not fetch ${url} after 4 attempts (direct + allorigins proxy). The source may be down or blocking.` });
+  return res.status(502).json({ error: `Could not fetch ${url} via direct or any CORS proxy (allorigins, codetabs, corsproxy.io all failed). The source may be down or blocking.` });
 });
 
 // ── Main endpoint ─────────────────────────────────────────────────────────
