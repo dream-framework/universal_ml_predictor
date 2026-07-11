@@ -45,11 +45,11 @@
       "n_points_estimate": 9000
     },
     {
-      "label": "🌐 Wilshire 5000 total market index (daily, FRED)",
+      "label": "🌐 S&P 500 daily close (FRED SP500)",
       "domain": "economic",
-      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=WILL5000IND",
-      "description": "Wilshire 5000 full cap total return index, daily. ~8,000 points back to 1990. CSV. CORS-open, no key.",
-      "n_points_estimate": 8000
+      "url": "https://fred.stlouisfed.org/graph/fredgraph.csv?id=SP500",
+      "description": "S&P 500 daily close, ~17,000 points back to 1950. CSV. CORS-open, no key.",
+      "n_points_estimate": 17000
     },
     {
       "label": "☀️ NOAA solar wind speed (real-time, 1-min)",
