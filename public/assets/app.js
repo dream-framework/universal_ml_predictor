@@ -233,8 +233,8 @@ function renderActiveTab() {
   else if (tab === 'phase') renderPhaseTab(chart);
 }
 
-function commonChartOpts() {
-  return {
+function commonChartOpts(includeZoom = true) {
+  const opts = {
     backgroundColor: 'transparent',
     textStyle: { color: '#e5e7eb', fontFamily: 'Inter, system-ui, sans-serif' },
     tooltip: { trigger: 'axis', backgroundColor: '#0b1220', borderColor: '#2d3a52', textStyle: { color: '#e5e7eb' } },
@@ -242,11 +242,86 @@ function commonChartOpts() {
     grid: { left: 56, right: 24, top: 38, bottom: 60 },
     xAxis: { axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' } },
     yAxis: { axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' }, splitLine: { lineStyle: { color: '#1f2937' } } },
-    dataZoom: [
-      { type: 'inside', start: 0, end: 100 },
-      { type: 'slider', height: 18, bottom: 18, borderColor: '#2d3a52', fillerColor: 'rgba(96,165,250,0.15)', handleStyle: { color: '#60a5fa' } },
-    ],
+    toolbox: {
+      right: 12,
+      top: 4,
+      itemSize: 15,
+      itemGap: 12,
+      showTitle: false,  // hide text labels until hover
+      // Glass look: almost invisible by default, pops on hover
+      iconStyle: {
+        borderColor: 'rgba(139,151,173,0.18)',
+        borderWidth: 1,
+        color: 'transparent',
+        borderType: 'solid',
+      },
+      emphasis: {
+        iconStyle: {
+          borderColor: '#60a5fa',
+          borderWidth: 1.4,
+          color: 'rgba(96,165,250,0.12)',
+          shadowBlur: 6,
+          shadowColor: 'rgba(96,165,250,0.4)',
+        },
+      },
+      feature: {
+        dataZoom: { yAxisIndex: 'none', title: { zoom: 'Zoom in (drag to select)', back: 'Zoom back out' } },
+        restore: { title: 'Reset zoom' },
+        saveAsImage: { title: 'Save as PNG', name: 'predictor-chart', pixelRatio: 2 },
+        myFullscreen: {
+          show: true,
+          title: 'Fullscreen',
+          icon: 'path://M3,3 L9,3 L9,5 L5,5 L5,9 L3,9 Z M15,3 L21,3 L21,9 L19,9 L19,5 L15,5 Z M21,15 L21,21 L15,21 L15,19 L19,19 L19,15 Z M9,21 L3,21 L3,15 L5,15 L5,19 L9,19 Z',
+          onclick: function () { toggleFullscreen(); },
+        },
+      },
+    },
   };
+  if (includeZoom) {
+    opts.dataZoom = [
+      { type: 'inside', start: 0, end: 100, filterMode: 'none' },
+      { type: 'slider', height: 18, bottom: 18, borderColor: '#2d3a52', fillerColor: 'rgba(96,165,250,0.15)', handleStyle: { color: '#60a5fa' }, filterMode: 'none' },
+    ];
+  }
+  return opts;
+}
+
+// ── Fullscreen toggle ─────────────────────────────────────────────────────
+let _isFullscreen = false;
+let _preFullscreenParent = null;
+let _preFullscreenStyle = '';
+function toggleFullscreen() {
+  const host = $('chartHost');
+  if (!host) return;
+  if (!_isFullscreen) {
+    // Enter fullscreen: detach chart host, append to body with fixed styling
+    _preFullscreenParent = host.parentNode;
+    _preFullscreenStyle = host.getAttribute('style') || '';
+    host.setAttribute('style', 'position:fixed;inset:0;z-index:9999;background:#07091a;width:100vw;height:100vh;padding:24px;');
+    document.body.appendChild(host);
+    // Add an exit button overlay
+    const exit = document.createElement('button');
+    exit.id = 'chartExitFs';
+    exit.setAttribute('style', 'position:fixed;top:16px;right:16px;z-index:10000;background:#60a5fa;color:#0a0f1d;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit;');
+    exit.textContent = '× Exit fullscreen';
+    exit.onclick = () => toggleFullscreen();
+    document.body.appendChild(exit);
+    _isFullscreen = true;
+  } else {
+    // Exit fullscreen
+    if (_preFullscreenParent) {
+      _preFullscreenParent.appendChild(host);
+      host.setAttribute('style', _preFullscreenStyle);
+    }
+    const exit = $('chartExitFs');
+    if (exit) exit.remove();
+    _isFullscreen = false;
+  }
+  // Resize the active chart after a tick so it fills the new container
+  setTimeout(() => {
+    const activeChart = state.charts[state.activeTab];
+    if (activeChart) activeChart.resize();
+  }, 50);
 }
 
 function renderSeriesTab(chart) {
@@ -292,7 +367,7 @@ function renderPredictionsTab(chart) {
   const fwdIdx = lastIdx + ml.horizon;
   const fwdValue = values[lastIdx] * (1 + ml.model_next_return);
   chart.setOption({
-    ...commonChartOpts(),
+    ...commonChartOpts(true),
     title: { text: `Predictions — test set + ${ml.horizon}-step forward forecast`, left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
     xAxis: { ...commonChartOpts().xAxis, type: 'value', name: 'step', nameTextStyle: { color: '#8b97ad' } },
     yAxis: { ...commonChartOpts().yAxis, type: 'value', scale: true, name: a.series.unit || 'value', nameTextStyle: { color: '#8b97ad' } },
@@ -317,11 +392,8 @@ function renderMatchupTab(chart) {
     return;
   }
   chart.setOption({
-    backgroundColor: 'transparent',
-    textStyle: { color: '#e5e7eb', fontFamily: 'Inter, system-ui, sans-serif' },
+    ...commonChartOpts(false),
     title: { text: 'Our model vs baseline', left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
-    tooltip: { trigger: 'axis', backgroundColor: '#0b1220', borderColor: '#2d3a52', textStyle: { color: '#e5e7eb' } },
-    legend: { top: 6, textStyle: { color: '#8b97ad' } },
     grid: { left: 60, right: 30, top: 38, bottom: 30 },
     xAxis: { type: 'category', data: ['hit rate', 'MAE (lower better)', 'next return'], axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' } },
     yAxis: [
@@ -377,13 +449,19 @@ function renderPhaseTab(chart) {
     value: [r.mean, r.vol, i / rolling.length],
   }));
   chart.setOption({
-    backgroundColor: 'transparent',
-    textStyle: { color: '#e5e7eb', fontFamily: 'Inter, system-ui, sans-serif' },
+    ...commonChartOpts(false),
     title: { text: 'Phase space — rolling mean vs volatility (color = time)', left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
     tooltip: { trigger: 'item', backgroundColor: '#0b1220', borderColor: '#2d3a52', textStyle: { color: '#e5e7eb' }, formatter: (p) => `step ${p.data.value[2] === 0 ? '0%' : (p.data.value[2] * 100).toFixed(0) + '%'}<br/>mean: ${fmt(p.data.value[0])}<br/>vol: ${fmt(p.data.value[1])}` },
-    grid: { left: 56, right: 24, top: 38, bottom: 36 },
-    xAxis: { type: 'value', name: 'rolling mean', nameTextStyle: { color: '#8b97ad' }, axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' }, splitLine: { lineStyle: { color: '#1f2937' } } },
-    yAxis: { type: 'value', name: 'volatility', nameTextStyle: { color: '#8b97ad' }, axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' }, splitLine: { lineStyle: { color: '#1f2937' } } },
+    grid: { left: 56, right: 80, top: 38, bottom: 60 },
+    xAxis: { type: 'value', name: 'rolling mean', nameTextStyle: { color: '#8b97ad' }, axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' }, splitLine: { lineStyle: { color: '#1f2937' } }, scale: true },
+    yAxis: { type: 'value', name: 'volatility', nameTextStyle: { color: '#8b97ad' }, axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad' }, splitLine: { lineStyle: { color: '#1f2937' } }, scale: true },
+    // Scatter needs both-axis zoom — dots cluster on X and Y independently
+    dataZoom: [
+      { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+      { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+      { type: 'slider', xAxisIndex: 0, height: 16, bottom: 18, borderColor: '#2d3a52', fillerColor: 'rgba(96,165,250,0.15)', handleStyle: { color: '#60a5fa' } },
+      { type: 'slider', yAxisIndex: 0, width: 16, right: 24, borderColor: '#2d3a52', fillerColor: 'rgba(96,165,250,0.15)', handleStyle: { color: '#60a5fa' } },
+    ],
     visualMap: {
       min: 0, max: 1, dimension: 2, show: false,
       inRange: { color: ['#60a5fa', '#34d399', '#f472b6'] },
@@ -391,6 +469,7 @@ function renderPhaseTab(chart) {
     series: [{
       type: 'scatter', data, symbolSize: 7,
       itemStyle: { opacity: 0.7 },
+      emphasis: { scale: 1.8, itemStyle: { borderColor: '#fff', borderWidth: 1 } },
     }],
   });
 }
@@ -446,6 +525,13 @@ function init() {
   });
   window.addEventListener('resize', () => {
     Object.values(state.charts).forEach(c => c && c.resize());
+  });
+  // Esc exits fullscreen chart
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _isFullscreen) {
+      e.preventDefault();
+      toggleFullscreen();
+    }
   });
   refreshStatus();
 }
