@@ -50,7 +50,7 @@
               <p>Good examples to try:</p>
               <ul>
                 <li><code>https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson</code></li>
-                <li><code>https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=2y&interval=1d</code></li>
+                <li><code>https://query2.finance.yahoo.com/v8/finance/chart/^GSPC?range=2y&interval=1d</code></li>
                 <li>Any CSV with a date column and a numeric column</li>
               </ul>
               <p class="muted">The bot uses a shared key on the backend — just paste a URL or drop a file to get started.</p>
@@ -65,6 +65,13 @@
           <div class="input-row">
             <textarea id="chatInput" rows="2" placeholder="Paste a URL, drop a file above, or ask anything…  (Enter = send, Shift+Enter = newline)"></textarea>
             <button id="sendBtn" type="button">Send</button>
+          </div>
+          <div class="action-row">
+            <button id="resetBtn" type="button" class="ghost-btn-sm">↻ Reset</button>
+            <button id="saveBtn" type="button" class="ghost-btn-sm">⤓ Save to registry</button>
+            <button id="historyBtn" type="button" class="ghost-btn-sm">≡ History</button>
+            <span class="action-spacer"></span>
+            <span id="registryStatus" class="registry-status"></span>
           </div>
         </div>
       </div>
@@ -97,10 +104,56 @@
     </footer>
   </div>
 
+  <!-- ═══ HISTORY MODAL ═════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="historyModal" aria-hidden="true">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h3>≡ Saved analyses</h3>
+        <button id="historyClose" type="button" class="ghost-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="historyList" class="history-list">
+          <div class="empty">No saved analyses yet. Run an analysis, then click "Save to registry".</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ REGISTRY SETTINGS MODAL ═══════════════════════════════════════ -->
+  <div class="modal-overlay" id="registryModal" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Registry settings</h3>
+        <button id="registryClose" type="button" class="ghost-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <label>
+          <span>GitHub repo (owner/repo)</span>
+          <input type="text" id="regRepoInput" placeholder="dream-framework/predictor-results" autocomplete="off" />
+          <small>Create an empty repo on GitHub first. The repo can be public or private.</small>
+        </label>
+        <label>
+          <span>GitHub token (fine-grained, contents:write)</span>
+          <input type="password" id="regTokenInput" placeholder="github_pat_..." autocomplete="off" />
+          <small>Create at <a href="https://github.com/settings/tokens?type=beta" target="_blank" rel="noreferrer">github.com/settings/tokens?type=beta</a>. Token stays in your browser's localStorage — never sent anywhere except api.github.com.</small>
+        </label>
+        <label>
+          <span>Branch (default: main)</span>
+          <input type="text" id="regBranchInput" placeholder="main" autocomplete="off" />
+        </label>
+        <div class="modal-actions">
+          <button id="registrySave" type="button" class="primary-btn">Save</button>
+          <button id="registryClear" type="button" class="ghost-btn">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   <script src="./assets/engine.js?v=20260710-pages-1"></script>
   <script src="./assets/adapters.js?v=20260710-pages-1"></script>
   <script src="./assets/groq.js?v=20260710-pages-1"></script>
+  <script src="./assets/registry.js?v=20260710-pages-1"></script>
   <script src="./assets/app.js?v=20260710-pages-1"></script>
 </body>
 </html>
