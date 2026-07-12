@@ -202,13 +202,58 @@ async function runAnalysis(text, fileContent, fileName, feedLabel) {
 function renderDashboardSummary(a) {
   const v = VERDICT_LABELS[a.verdict] || { text: a.verdict?.toLowerCase() || '—', cls: 'warn' };
   const ml = a.ml || {};
-  const diff = (Number.isFinite(ml.model_hit_rate) && Number.isFinite(ml.baseline_hit_rate))
-    ? (ml.model_hit_rate - ml.baseline_hit_rate) * 100
-    : null;
+  const reg = ml.regression || {};
+  const cls = ml.classification || {};
+
+  // Find best regression model
+  let bestReg = null, bestRegName = '';
+  if (!reg.error) {
+    for (const [name, m] of Object.entries(reg)) {
+      if (typeof m !== 'object' || !m || m.hit_rate == null) continue;
+      if (!bestReg || m.hit_rate > bestReg.hit_rate) { bestReg = m; bestRegName = name; }
+    }
+  }
+  // Find best classification model
+  let bestCls = null, bestClsName = '';
+  if (!cls.error && cls.models) {
+    for (const [name, m] of Object.entries(cls.models)) {
+      if (name === 'next_prediction' || !m || m.accuracy == null) continue;
+      if (!bestCls || m.accuracy > bestCls.accuracy) { bestCls = m; bestClsName = name; }
+    }
+  }
+
+  const diff = bestReg ? (bestReg.hit_rate - (reg.mean?.hit_rate || 0)) * 100 : null;
   const diffStr = diff === null ? '' : (diff >= 0
-    ? ` Our model beats baseline by <b>${diff.toFixed(1)} pp</b> on hit rate.`
-    : ` Our model underperforms baseline by <b>${(-diff).toFixed(1)} pp</b> on hit rate.`);
-  return `<p>Done. Read <b>${a.series.n_points}</b> points from <b>${esc(a.series.label || '')}</b>. Signal: <b>${esc(v.text)}</b> (fit quality ${pct(a.fit.r2, 1)}).${diffStr} Dashboard updated — check the charts on the right.</p>`;
+    ? ` Best regression model: <b>${bestRegName}</b> (${pct(bestReg.hit_rate)}, +${diff.toFixed(1)}pp vs mean baseline).`
+    : ` Best regression: <b>${bestRegName}</b> (${pct(bestReg.hit_rate)}, ${(-diff).toFixed(1)}pp below mean).`);
+  const clsStr = bestCls ? ` Best classifier: <b>${bestClsName}</b> (${pct(bestCls.accuracy)} accuracy).` : '';
+
+  // Build KPI strip HTML
+  const kpiHtml = `
+    <div class="kpi-strip" id="kpiStrip">
+      <div class="kpi-item ${v.cls}">
+        <span class="kpi-label">Signal</span>
+        <b class="kpi-value">${esc(v.text)}</b>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">Fit quality</span>
+        <b class="kpi-value">${pct(a.fit.r2, 0)}</b>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">Points</span>
+        <b class="kpi-value">${a.series.n_points.toLocaleString()}</b>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">Best regression</span>
+        <b class="kpi-value">${bestReg ? pct(bestReg.hit_rate, 0) : '—'}</b>
+      </div>
+      <div class="kpi-item">
+        <span class="kpi-label">Best classifier</span>
+        <b class="kpi-value">${bestCls ? pct(bestCls.accuracy, 0) : '—'}</b>
+      </div>
+    </div>`;
+
+  return `<p>Read <b>${a.series.n_points.toLocaleString()}</b> points from <b>${esc(a.series.label || '')}</b>. Signal: <b>${esc(v.text)}</b> (fit quality ${pct(a.fit.r2, 1)}).${diffStr}${clsStr} Dashboard updated.</p>${kpiHtml}`;
 }
 
 // ── Dashboard rendering ───────────────────────────────────────────────────
