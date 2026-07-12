@@ -1,105 +1,29 @@
 {
-  "schema": "predictor-feeds.v1",
-  "updated": "2026-07-11",
+  "schema": "predictor-feeds.v2",
+  "updated": "2026-07-13",
   "feeds": [
-    {
-      "label": "🌍 USGS Global Earthquakes (30 days, hourly)",
-      "domain": "geophysical",
-      "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson",
-      "description": "Every recorded earthquake worldwide, bucketed into hourly counts. ~720 points. CORS-open, no key.",
-      "n_points_estimate": 720
-    },
-    {
-      "label": "🌊 USGS Potomac River flow (30 days, 5-min)",
-      "domain": "geophysical",
-      "url": "https://waterservices.usgs.gov/nwis/iv/?sites=01646500&parameterCd=00060&startDT=2026-06-11&endDT=2026-07-11&format=json",
-      "description": "Potomac River discharge at Point of Rocks, MD. ~8,600 points at 5-min cadence. CORS-open, no key.",
-      "n_points_estimate": 8600
-    },
-    {
-      "label": "₿ Bitcoin daily closes (1 year, CoinGecko)",
-      "domain": "crypto",
-      "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",
-      "description": "BTC-USD daily close prices for the last 365 days. ~366 points. CORS-open, no key.",
-      "n_points_estimate": 366
-    },
-    {
-      "label": "🪙 Ethereum daily closes (1 year, CoinGecko)",
-      "domain": "crypto",
-      "url": "https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=365&interval=daily",
-      "description": "ETH-USD daily close prices, last 365 days. ~366 points. CORS-open, no key.",
-      "n_points_estimate": 366
-    },
-    {
-      "label": "☀️ NOAA GOES X-ray flux (6 hours, 1-min)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json",
-      "description": "GOES satellite X-ray flux at 1-min cadence, last 6 hours. ~360 points. CORS-open, no key.",
-      "n_points_estimate": 360
-    },
-    {
-      "label": "🧲 NOAA GOES magnetometer (6 hours, 1-min)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json",
-      "description": "GOES magnetometer (Hp component) at 1-min cadence, last 6 hours. ~360 points. CORS-open, no key.",
-      "n_points_estimate": 360
-    },
-    {
-      "label": "⚡ NOAA GOES ≥2MeV electrons (6 hours)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-6-hour.json",
-      "description": "GOES integral electron flux ≥2 MeV, last 6 hours. ~70 points. CORS-open, no key.",
-      "n_points_estimate": 70
-    },
-    {
-      "label": "🚀 NOAA GOES ≥10MeV protons (6 hours)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json",
-      "description": "GOES integral proton flux ≥10 MeV, last 6 hours. ~570 points. CORS-open, no key.",
-      "n_points_estimate": 570
-    },
-    {
-      "label": "🌬️ NOAA solar wind speed (real-time, 1-min)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
-      "description": "Real-time solar wind proton speed from NOAA SWPC. ~3,000 points (last 2 days at 1-min cadence). CORS-open, no key.",
-      "n_points_estimate": 3000
-    },
-    {
-      "label": "🧲 NOAA planetary K-index (3-hourly)",
-      "domain": "space_weather",
-      "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
-      "description": "Planetary K index every 3 hours. ~1,000 points (last 4 months). CORS-open, no key.",
-      "n_points_estimate": 1000
-    },
-    {
-      "label": "📖 Wikimedia 'Earth' pageviews (daily, 2.5 years)",
-      "domain": "society",
-      "url": "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Earth/daily/20240101/20260711",
-      "description": "Daily pageview counts for the Wikipedia 'Earth' article. ~920 points back to Jan 2024. CORS-open, no key.",
-      "n_points_estimate": 920
-    },
-    {
-      "label": "🏦 World Bank USA GDP (annual, 65 years)",
-      "domain": "economic",
-      "url": "https://api.worldbank.org/v2/country/USA/indicator/NY.GDP.MKTP.CD?format=json&per_page=100",
-      "description": "US GDP in current USD, annual. ~65 points back to 1960. CORS-open, no key.",
-      "n_points_estimate": 65
-    },
-    {
-      "label": "💰 World Bank USA CPI (annual, 65 years)",
-      "domain": "economic",
-      "url": "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL?format=json&per_page=100",
-      "description": "US Consumer Price Index, annual. ~65 points back to 1960. CORS-open, no key.",
-      "n_points_estimate": 65
-    },
-    {
-      "label": "📉 World Bank USA Unemployment (annual, 35 years)",
-      "domain": "economic",
-      "url": "https://api.worldbank.org/v2/country/USA/indicator/SL.UEM.TOTL.ZS?format=json&per_page=100",
-      "description": "US unemployment rate, annual. ~35 points back to 1991. CORS-open, no key.",
-      "n_points_estimate": 35
-    }
+    {"label": "🌍 USGS Global Earthquakes (30d, hourly)", "domain": "geophysical", "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson", "description": "~720 hourly counts. CORS-open, no key.", "n_points_estimate": 720},
+    {"label": "🌊 USGS Potomac River flow (30d, 5-min)", "domain": "geophysical", "url": "https://waterservices.usgs.gov/nwis/iv/?sites=01646500&parameterCd=00060&startDT=2026-06-13&endDT=2026-07-13&format=json", "description": "~8,600 points at 5-min cadence. CORS-open.", "n_points_estimate": 8600},
+    {"label": "💧 NOAA Water Level Providence RI (1 day, 6-min)", "domain": "geophysical", "url": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date=20260712&end_date=20260713&station=8454000&product=water_level&datum=mllw&units=metric&time_zone=gmt&format=json&interval=6", "description": "Tidal water level, ~480 points. CORS-open.", "n_points_estimate": 480},
+    {"label": "🌡️ Open-Meteo Berlin Temperature (1yr, hourly)", "domain": "climate", "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=temperature_2m", "description": "Hourly temperature, ~8,760 points. CORS-open, no key.", "n_points_estimate": 8760},
+    {"label": "💨 Open-Meteo Berlin Wind Speed (1yr, hourly)", "domain": "climate", "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=wind_speed_10m", "description": "Hourly wind speed, ~8,760 points. CORS-open.", "n_points_estimate": 8760},
+    {"label": "💧 Open-Meteo Berlin Humidity (1yr, hourly)", "domain": "climate", "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=relative_humidity_2m", "description": "Hourly relative humidity, ~8,760 points. CORS-open.", "n_points_estimate": 8760},
+    {"label": "🌡️ Open-Meteo Tokyo Temperature (1yr, hourly)", "domain": "climate", "url": "https://archive-api.open-meteo.com/v1/archive?latitude=35.69&longitude=139.69&start_date=2025-07-01&end_date=2026-07-01&hourly=temperature_2m", "description": "Tokyo hourly temperature, ~8,760 points. CORS-open.", "n_points_estimate": 8760},
+    {"label": "🌡️ Open-Meteo NYC Temperature (1yr, hourly)", "domain": "climate", "url": "https://archive-api.open-meteo.com/v1/archive?latitude=40.71&longitude=-74.01&start_date=2025-07-01&end_date=2026-07-01&hourly=temperature_2m", "description": "New York hourly temperature, ~8,760 points. CORS-open.", "n_points_estimate": 8760},
+    {"label": "₿ Binance BTC/USDT daily (1yr)", "domain": "crypto", "url": "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=365", "description": "BTC daily closes, ~365 points. CORS-open.", "n_points_estimate": 365},
+    {"label": "🪙 Binance ETH/USDT daily (1yr)", "domain": "crypto", "url": "https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1d&limit=365", "description": "ETH daily closes, ~365 points. CORS-open.", "n_points_estimate": 365},
+    {"label": "₿ CoinGecko BTC daily (1yr)", "domain": "crypto", "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily", "description": "BTC daily closes via CoinGecko, ~366 points. CORS-open.", "n_points_estimate": 366},
+    {"label": "🪙 CoinGecko ETH daily (1yr)", "domain": "crypto", "url": "https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=365&interval=daily", "description": "ETH daily closes via CoinGecko, ~366 points. CORS-open.", "n_points_estimate": 366},
+    {"label": "☀️ NOAA GOES X-ray flux (6h, 1-min)", "domain": "space_weather", "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json", "description": "GOES X-ray flux, ~360 points. CORS-open.", "n_points_estimate": 360},
+    {"label": "🧲 NOAA GOES Magnetometer (6h, 1-min)", "domain": "space_weather", "url": "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json", "description": "GOES magnetometer (Hp), ~360 points. CORS-open.", "n_points_estimate": 360},
+    {"label": "⚡ NOAA GOES Electrons ≥2MeV (6h)", "domain": "space_weather", "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-6-hour.json", "description": "Integral electron flux, ~70 points. CORS-open.", "n_points_estimate": 70},
+    {"label": "🚀 NOAA GOES Protons ≥10MeV (6h)", "domain": "space_weather", "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json", "description": "Integral proton flux, ~570 points. CORS-open.", "n_points_estimate": 570},
+    {"label": "🌬️ NOAA Solar Wind Speed (real-time, 1-min)", "domain": "space_weather", "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json", "description": "Solar wind proton speed, ~3,000 points. CORS-open.", "n_points_estimate": 3000},
+    {"label": "🧲 NOAA Planetary K-index (3-hourly)", "domain": "space_weather", "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json", "description": "Kp index every 3h, ~1,000 points. CORS-open.", "n_points_estimate": 1000},
+    {"label": "📖 Wikimedia 'Earth' Pageviews (2.5yr daily)", "domain": "society", "url": "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Earth/daily/20240101/20260713", "description": "Daily pageviews for Wikipedia 'Earth', ~920 points. CORS-open.", "n_points_estimate": 920},
+    {"label": "🏦 World Bank USA GDP (annual, 65yr)", "domain": "economic", "url": "https://api.worldbank.org/v2/country/USA/indicator/NY.GDP.MKTP.CD?format=json&per_page=100", "description": "US GDP annual, ~65 points. CORS-open.", "n_points_estimate": 65},
+    {"label": "💰 World Bank USA CPI (annual, 65yr)", "domain": "economic", "url": "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL?format=json&per_page=100", "description": "US CPI annual, ~65 points. CORS-open.", "n_points_estimate": 65},
+    {"label": "📉 World Bank USA Unemployment (annual, 35yr)", "domain": "economic", "url": "https://api.worldbank.org/v2/country/USA/indicator/SL.UEM.TOTL.ZS?format=json&per_page=100", "description": "US unemployment, ~35 points. CORS-open.", "n_points_estimate": 35}
   ],
-  "notes": "All feeds are CORS-open (work direct from browser, no proxy needed) and require no API key. Sources match the DREAM retention page (https://dream-physics.onrender.com/retention). To add more CoinGecko coins, change the 'bitcoin' or 'ethereum' path segment. To add more World Bank indicators, change the indicator code (e.g. NY.GDP.MKTP.CD for GDP, FP.CPI.TOTL for CPI)."
+  "notes": "All feeds are CORS-open (work direct from browser, no proxy needed). 22 feeds across 6 domains. To add more Open-Meteo locations, change lat/lon. To add more Binance pairs, change symbol (e.g. SOLUSDT, ADAUSDT)."
 }
