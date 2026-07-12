@@ -70,6 +70,40 @@ function seriesFromJSON(text, label = 'JSON upload') {
   // ── DREAM-site data source adapters ─────────────────────────────────────
   // Each of these matches a source listed on https://dream-physics.onrender.com/retention
 
+  // Open-Meteo (weather archive + forecast) — {hourly: {time: [...], temperature_2m: [...]}}
+  if (body?.hourly && Array.isArray(body.hourly.time)) {
+    const time = body.hourly.time;
+    // Find the first numeric data field (not 'time')
+    const dataKey = Object.keys(body.hourly).find(k => k !== 'time' && Array.isArray(body.hourly[k]) && Number.isFinite(Number(body.hourly[k][0])));
+    if (dataKey) {
+      const vals = body.hourly[dataKey];
+      const points = [];
+      for (let i = 0; i < time.length; i++) {
+        if (vals[i] != null && Number.isFinite(Number(vals[i]))) {
+          points.push({ t: time[i], v: Number(vals[i]) });
+        }
+      }
+      if (points.length) return { points, label: label + ' (' + dataKey + ')', unit: body.hourly_units?.[dataKey] || dataKey, source: 'Open-Meteo' };
+    }
+  }
+
+  // NOAA Tides & Currents — {data: [{t: "2026-07-10 00:00", v: "1.724"}, ...]}
+  if (body?.data?.length && body.data[0]?.t && 'v' in body.data[0]) {
+    const points = body.data
+      .map(d => ({ t: d.t, v: Number(d.v) }))
+      .filter(p => Number.isFinite(p.v));
+    if (points.length) return { points, label: label + ' (water level)', unit: 'm', source: 'NOAA Tides & Currents' };
+  }
+
+  // Binance klines — [[open_time_ms, open, high, low, close, volume, ...], ...]
+  if (Array.isArray(body) && body.length && Array.isArray(body[0]) && body[0].length >= 5) {
+    const points = body.map(row => ({
+      t: new Date(Number(row[0])).toISOString().slice(0, 10),
+      v: Number(row[4]),  // close price
+    })).filter(p => Number.isFinite(p.v));
+    if (points.length) return { points, label: label + ' (close)', unit: 'usd', source: 'Binance' };
+  }
+
   // NOAA SWPC GOES — array of {time_tag, flux/He/Hp/...} (X-rays, magnetometer, electrons, protons)
   // Pick the most plausible numeric field automatically.
   if (Array.isArray(body) && body.length && body[0].time_tag) {
