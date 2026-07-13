@@ -302,6 +302,7 @@ function renderActiveTab() {
   else if (tab === 'matchup') renderMatchupTab(chart);
   else if (tab === 'rolling') renderRollingTab(chart);
   else if (tab === 'phase') renderPhaseTab(chart);
+  else if (tab === 'dust') renderDustTab(chart);
 }
 
 function commonChartOpts(includeZoom = true) {
@@ -381,6 +382,7 @@ function ensureFsOverlay() {
       ['matchup', '⚖ Match-up'],
       ['rolling', '📊 Rolling'],
       ['phase', '🌌 Phase'],
+      ['dust', '🔬 Dust'],
     ];
     const fsTabs = $('fsTabs');
     tabs.forEach(([key, label]) => {
@@ -414,6 +416,7 @@ function renderFsTab() {
   else if (tab === 'matchup') renderMatchupTab(state.fsChart);
   else if (tab === 'rolling') renderRollingTab(state.fsChart);
   else if (tab === 'phase') renderPhaseTab(state.fsChart);
+  else if (tab === 'dust') renderDustTab(state.fsChart);
   // Highlight the active tab button
   document.querySelectorAll('#fsTabs button').forEach(b => {
     const active = b.dataset.fstab === tab;
@@ -605,6 +608,85 @@ function renderPhaseTab(chart) {
       itemStyle: { opacity: 0.7 },
       emphasis: { scale: 1.8, itemStyle: { borderColor: '#fff', borderWidth: 1 } },
     }],
+  });
+}
+
+// ── Dust Fields tab ───────────────────────────────────────────────────────
+function renderDustTab(chart) {
+  const a = state.analysis;
+  const dust = a.dust;
+  if (!dust || dust.error) {
+    chart.setOption({ title: { text: 'Dust decomposition unavailable — ' + (dust?.error || 'no data'), left: 'center', top: 'center', textStyle: { color: '#8b97ad', fontSize: 13 } } });
+    return;
+  }
+
+  const values = a.series.values;
+  const dustArr = dust.dust;
+  const ridgeArr = dust.ridge;
+  const density = dust.dustDensity;
+  const fields = dust.fields || [];
+  const s = dust.summary || {};
+
+  // Downsample for charting (max 500 points)
+  const step = Math.max(1, Math.floor(values.length / 500));
+  const indices = [];
+  const ridgeData = [];
+  const dustData = [];
+  const densityData = [];
+  for (let i = 0; i < values.length; i += step) {
+    indices.push(i);
+    ridgeData.push([i, ridgeArr[i] || 0]);
+    dustData.push([i, dustArr[i] || 0]);
+    if (density[i]) densityData.push([i, density[i].density]);
+  }
+
+  // Mark field regions with markArea
+  const markAreas = fields.slice(0, 20).map(f => [{
+    xAxis: f.start,
+    itemStyle: { color: 'rgba(244,114,182,0.08)' }
+  }, {
+    xAxis: f.end
+  }]);
+
+  // Dust S2 fit info for title
+  const dustDFmt = Number.isFinite(s.dust_D) ? s.dust_D.toFixed(3) : '—';
+  const dustR2Fmt = Number.isFinite(s.dust_r2) ? (s.dust_r2 * 100).toFixed(1) + '%' : '—';
+  const fieldStr = s.field_count != null ? `${s.field_count} field${s.field_count === 1 ? '' : 's'}` : '—';
+  const hasFields = s.has_fields ? ' — STRUCTURED DUST (fields detected)' : ' — uniform dust (no fields)';
+
+  chart.setOption({
+    ...commonChartOpts(),
+    title: {
+      text: `Dust decomposition — ridge vs dust + density fields`,
+      subtext: `Dust D=${dustDFmt} | dust R²=${dustR2Fmt} | ${fieldStr}${hasFields}`,
+      left: 8, top: 0,
+      textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 },
+      subtextStyle: { color: '#6b7280', fontSize: 11 }
+    },
+    legend: { top: 28, textStyle: { color: '#8b97ad', fontSize: 11 } },
+    grid: { left: 56, right: 56, top: 52, bottom: 60 },
+    xAxis: { ...commonChartOpts().xAxis, type: 'category', data: indices },
+    yAxis: [
+      { type: 'value', name: 'value', position: 'left', axisLine: { lineStyle: { color: '#60a5fa' } }, axisLabel: { color: '#60a5fa' }, splitLine: { lineStyle: { color: '#1f2937' } }, scale: true },
+      { type: 'value', name: 'dust density', position: 'right', axisLine: { lineStyle: { color: '#f472b6' } }, axisLabel: { color: '#f472b6' }, splitLine: { show: false }, scale: true },
+    ],
+    series: [
+      {
+        name: 'ridge (durable)', type: 'line', yAxisIndex: 0, data: ridgeData,
+        showSymbol: false, lineStyle: { color: '#60a5fa', width: 2 },
+        areaStyle: { color: 'rgba(96,165,250,0.08)' },
+      },
+      {
+        name: 'dust (residual)', type: 'line', yAxisIndex: 0, data: dustData,
+        showSymbol: false, lineStyle: { color: '#ff9a4a', width: 1, opacity: 0.6 },
+        markArea: { silent: true, data: markAreas },
+      },
+      {
+        name: 'dust density', type: 'line', yAxisIndex: 1, data: densityData,
+        showSymbol: false, lineStyle: { color: '#f472b6', width: 1.5, type: 'dashed' },
+        areaStyle: { color: 'rgba(244,114,182,0.1)' },
+      },
+    ],
   });
 }
 
