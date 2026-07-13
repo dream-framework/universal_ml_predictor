@@ -242,8 +242,8 @@ body {
 @keyframes chartFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ═══ KPI STRIP ══════════════════════════════════════════════════════ */
-.kpi-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin: 8px 0 4px; }
-@media (max-width: 600px) { .kpi-strip { grid-template-columns: repeat(2, 1fr); } }
+.kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 4px; }
+@media (max-width: 600px) { .kpi-strip { grid-template-columns: 1fr; } }
 .kpi-item {
   background: rgba(255,255,255,0.04); border: 1px solid var(--line);
   border-radius: 7px; padding: 6px 8px; text-align: center;
@@ -257,6 +257,12 @@ body {
 .kpi-label { display: block; font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1px; }
 .kpi-value { font-size: 15px; font-weight: 700; display: block; }
 .kpi-sub { display: block; font-size: 9.5px; color: var(--muted); margin-top: 1px; font-weight: 500; }
+.kpi-delta {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 1px 6px; border-radius: 999px; margin-top: 3px;
+}
+.kpi-delta.win { background: rgba(52,211,153,0.15); color: var(--accent2); }
+.kpi-delta.lose { background: rgba(255,107,107,0.12); color: var(--danger); }
 @keyframes kpiFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .kpi-item:nth-child(1) { animation-delay: 0.05s; }
 .kpi-item:nth-child(2) { animation-delay: 0.10s; }
