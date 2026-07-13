@@ -507,14 +507,14 @@ function renderPredictionsTab(chart) {
 function renderMatchupTab(chart) {
   const a = state.analysis;
   const ml = a.ml;
-  if (!ml || (ml.regression?.error && ml.classification?.error)) {
+  const reg = ml?.regression || {};
+  const cls = ml?.classification || {};
+  if (!ml || (reg.error && cls.error)) {
     chart.setOption({ title: { text: 'No ML comparison available', left: 'center', top: 'center', textStyle: { color: '#8b97ad' } } });
     return;
   }
 
   // ── Build model lists with clear "OURS" vs "BASELINE" grouping ──
-  // OUR models = ridge_s2 (regression) + logistic (classification, uses S2 features)
-  // BASELINE models = everything else (standard textbook features only)
   const C_OUR = '#34d399';       // green = our model
   const C_BASE = '#ff9a4a';      // amber = baseline
   const C_OTHER = '#60a5fa';     // blue = neither (kNN etc.)
@@ -527,9 +527,9 @@ function renderMatchupTab(chart) {
     { key: 'mean',           name: 'Mean baseline', hit: reg.mean?.hit_rate, mae: reg.mean?.mae, color: C_BASE, group: 'baseline' },
   ].filter(m => m.hit != null) : [];
 
-  const clsModels = ml.classification && !ml.classification.error ? [
-    { name: '★ Our Model (logistic + our features)', acc: ml.classification.models?.logistic?.accuracy, color: C_OUR, group: 'ours' },
-    { name: 'Naive Bayes', acc: ml.classification.models?.naive_bayes?.accuracy, color: C_OTHER, group: 'other' },
+  const clsModels = !cls.error && cls.models ? [
+    { name: '★ Our Model (logistic + our features)', acc: cls.models?.logistic?.accuracy, color: C_OUR, group: 'ours' },
+    { name: 'Naive Bayes', acc: cls.models?.naive_bayes?.accuracy, color: C_OTHER, group: 'other' },
     { name: 'kNN (k=5)', acc: ml.classification.models?.knn?.accuracy, color: C_OTHER, group: 'other' },
     { name: 'Majority baseline', acc: ml.classification.models?.majority?.accuracy, color: C_BASE, group: 'baseline' },
   ].filter(m => m.acc != null) : [];
