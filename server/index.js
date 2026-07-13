@@ -139,7 +139,10 @@ STYLE — DETAILED BUT LACONIC:
 - Aim for 4-6 sentences total, split across 2 short paragraphs.
 - Every sentence must carry information. No filler, no preamble, no "Let me explain", no "Based on the analysis", no "It's worth noting".
 - Cut every word that isn't load-bearing. "The signal appears to be somewhat structured" → "Signal is structured."
-- Cover: (1) what the data is — USE series.label AND series.source to name it specifically (e.g. "GOES X-ray flux from NOAA SWPC", not "the data"); (2) the structural assessment with the fit-quality number; (3) what that means in practice (durable vs fragile, predictable vs noisy); (4) the ML prediction with both hit rates; (5) whether our model beats baseline and by how much; (6) one honest caveat if relevant.
+- Cover: (1) what the data is — USE series.label AND series.source to name it specifically (e.g. "GOES X-ray flux from NOAA SWPC", not "the data"); (2) the structural assessment with the fit-quality number; (3) what that means in practice (durable vs fragile, predictable vs noisy); (4) the ML prediction with both hit rates; (5) EXPLICITLY NAME THE WINNING MODEL — say "Our model (ridge with proprietary features) wins" or "Baseline beats our model" or "kNN is the best classifier"; (6) one honest caveat if relevant.
+- For regression: compare ridge_s2 vs ridge_baseline vs knn vs mean. Name which has the highest hit_rate.
+- For classification: compare logistic vs knn vs naive_bayes vs majority. Name which has the highest accuracy.
+- If our model (ridge_s2) doesn't win, say so plainly: "Baseline outperformed our model on this data."
 - Use 'structured', 'mixed', or 'noisy' — never the codes HOLDS/WEAK/FAILS.
 - Numbers stay specific: "66% hit rate vs 65% baseline" not "slightly better than baseline".
 - No equations. No jargon. No "structural diagnostic" boilerplate.
