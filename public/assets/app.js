@@ -509,44 +509,116 @@ function renderMatchupTab(chart) {
     return;
   }
 
-  // Build a multi-model comparison table.
-  // Regression: hit_rate for each model
-  // Classification: accuracy for each model
+  // ── Build model lists with clear "OURS" vs "BASELINE" grouping ──
+  // OUR models = ridge_s2 (regression) + logistic (classification, uses S2 features)
+  // BASELINE models = everything else (standard textbook features only)
+  const C_OUR = '#34d399';       // green = our model
+  const C_BASE = '#ff9a4a';      // amber = baseline
+  const C_OTHER = '#60a5fa';     // blue = neither (kNN etc.)
+
   const regModels = ml.regression && !ml.regression.error ? [
-    { name: 'Ridge (our features)', hit: ml.regression.ridge_s2?.hit_rate, mae: ml.regression.ridge_s2?.mae, color: '#34d399' },
-    { name: 'Ridge (baseline feats)', hit: ml.regression.ridge_baseline?.hit_rate, mae: ml.regression.ridge_baseline?.mae, color: '#ff9a4a' },
-    { name: 'kNN (k=5)', hit: ml.regression.knn?.hit_rate, mae: ml.regression.knn?.mae, color: '#60a5fa' },
-    { name: 'Mean baseline', hit: ml.regression.mean?.hit_rate, mae: ml.regression.mean?.mae, color: '#8b97ad' },
+    { name: '★ Our Model (ridge + our features)', hit: ml.regression.ridge_s2?.hit_rate, mae: ml.regression.ridge_s2?.mae, color: C_OUR, group: 'ours' },
+    { name: 'Baseline (ridge, standard features)', hit: ml.regression.ridge_baseline?.hit_rate, mae: ml.regression.ridge_baseline?.mae, color: C_BASE, group: 'baseline' },
+    { name: 'kNN (k=5)', hit: ml.regression.knn?.hit_rate, mae: ml.regression.knn?.mae, color: C_OTHER, group: 'other' },
+    { name: 'Mean baseline', hit: ml.regression.mean?.hit_rate, mae: ml.regression.mean?.mae, color: C_BASE, group: 'baseline' },
   ].filter(m => m.hit != null) : [];
 
   const clsModels = ml.classification && !ml.classification.error ? [
-    { name: 'Logistic', acc: ml.classification.models?.logistic?.accuracy, color: '#34d399' },
-    { name: 'kNN', acc: ml.classification.models?.knn?.accuracy, color: '#60a5fa' },
-    { name: 'Naive Bayes', acc: ml.classification.models?.naive_bayes?.accuracy, color: '#f472b6' },
-    { name: 'Majority', acc: ml.classification.models?.majority?.accuracy, color: '#8b97ad' },
+    { name: '★ Our Model (logistic + our features)', acc: ml.classification.models?.logistic?.accuracy, color: C_OUR, group: 'ours' },
+    { name: 'Naive Bayes', acc: ml.classification.models?.naive_bayes?.accuracy, color: C_OTHER, group: 'other' },
+    { name: 'kNN (k=5)', acc: ml.classification.models?.knn?.accuracy, color: C_OTHER, group: 'other' },
+    { name: 'Majority baseline', acc: ml.classification.models?.majority?.accuracy, color: C_BASE, group: 'baseline' },
   ].filter(m => m.acc != null) : [];
 
-  // Combine: show regression hit rates and classification accuracies side by side
-  const allModels = [
-    ...regModels.map(m => ({ name: m.name + ' (reg)', value: m.hit, color: m.color, metric: 'hit rate' })),
-    ...clsModels.map(m => ({ name: m.name + ' (cls)', value: m.acc, color: m.color, metric: 'accuracy' })),
-  ];
+  // Build combined list with section dividers
+  const allModels = [];
+  if (regModels.length) {
+    allModels.push({ name: '── REGRESSION (hit rate) ──', value: null, isDivider: true, dividerText: 'REGRESSION — direction hit rate' });
+    regModels.forEach(m => allModels.push({ name: m.name, value: m.hit, color: m.color, group: m.group, metric: 'hit rate' }));
+  }
+  if (clsModels.length) {
+    allModels.push({ name: '── CLASSIFICATION (accuracy) ──', value: null, isDivider: true, dividerText: 'CLASSIFICATION — UP/DOWN/FLAT accuracy' });
+    clsModels.forEach(m => allModels.push({ name: m.name, value: m.acc, color: m.color, group: m.group, metric: 'accuracy' }));
+  }
 
   if (!allModels.length) {
     chart.setOption({ title: { text: 'No ML models could be trained on this data', left: 'center', top: 'center', textStyle: { color: '#8b97ad' } } });
     return;
   }
 
+  // Find winners
+  const regWinner = regModels.length ? regModels.reduce((a, b) => a.hit > b.hit ? a : b) : null;
+  const clsWinner = clsModels.length ? clsModels.reduce((a, b) => a.acc > b.acc ? a : b) : null;
+
+  // Build yAxis labels and bar data
+  // ECharts category axis: first item appears at bottom. We reverse for top-down reading.
+  const yLabels = allModels.map(m => m.isDivider ? m.dividerText : m.name).reverse();
+  const barData = allModels.map(m => {
+    if (m.isDivider) return { value: 0, itemStyle: { color: 'transparent' }, label: { show: false } };
+    const isWinner = (m.metric === 'hit rate' && regWinner && m.name === regWinner.name) ||
+                     (m.metric === 'accuracy' && clsWinner && m.name === clsWinner.name);
+    return {
+      value: m.value,
+      itemStyle: {
+        color: m.color,
+        borderRadius: [0, 4, 4, 0],
+        // Add glow to winner bars
+        shadowBlur: isWinner ? 12 : 0,
+        shadowColor: m.color,
+      },
+      label: {
+        show: true,
+        position: 'right',
+        color: isWinner ? '#fff' : '#e5e7eb',
+        fontWeight: isWinner ? 700 : 400,
+        formatter: (p) => (p.value * 100).toFixed(1) + '%' + (isWinner ? ' ★' : ''),
+      },
+    };
+  }).reverse();
+
+  // Winner subtitle
+  const regWinStr = regWinner ? `Regression winner: ${regWinner.name.replace('★ ', '')} (${(regWinner.hit * 100).toFixed(1)}%)` : '';
+  const clsWinStr = clsWinner ? `Classification winner: ${clsWinner.name.replace('★ ', '')} (${(clsWinner.acc * 100).toFixed(1)}%)` : '';
+  const ourRegWon = regWinner && regWinner.group === 'ours';
+  const ourClsWon = clsWinner && clsWinner.group === 'ours';
+
   chart.setOption({
     ...commonChartOpts(false),
-    title: { text: 'All models — regression hit rate & classification accuracy', left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
-    grid: { left: 100, right: 30, top: 38, bottom: 30 },
-    xAxis: { type: 'value', axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad', formatter: (v) => (v * 100).toFixed(0) + '%' }, splitLine: { lineStyle: { color: '#1f2937' } }, max: 1 },
-    yAxis: { type: 'category', data: allModels.map(m => m.name).reverse(), axisLine: { lineStyle: { color: '#2d3a52' } }, axisLabel: { color: '#8b97ad', fontSize: 11 } },
+    title: {
+      text: 'Model Match-up — ★ = our model, amber = baseline',
+      subtext: `${regWinStr}  |  ${clsWinStr}`,
+      left: 8, top: 0,
+      textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 },
+      subtextStyle: { color: ourRegWon && ourClsWon ? '#34d399' : (!ourRegWon && !ourClsWon ? '#ff9a4a' : '#8b97ad'), fontSize: 11 },
+    },
+    grid: { left: 180, right: 60, top: 52, bottom: 30 },
+    xAxis: {
+      type: 'value', max: 1,
+      axisLine: { lineStyle: { color: '#2d3a52' } },
+      axisLabel: { color: '#8b97ad', formatter: (v) => (v * 100).toFixed(0) + '%' },
+      splitLine: { lineStyle: { color: '#1f2937' } },
+    },
+    yAxis: {
+      type: 'category', data: yLabels,
+      axisLine: { lineStyle: { color: '#2d3a52' } },
+      axisLabel: {
+        color: (val) => {
+          if (val.includes('★')) return '#34d399';
+          if (val.includes('Baseline') || val.includes('Majority')) return '#ff9a4a';
+          if (val.includes('──')) return '#6b7280';
+          return '#8b97ad';
+        },
+        fontSize: (val) => val.includes('──') ? 10 : 11,
+        fontWeight: (val) => val.includes('★') ? 700 : 400,
+      },
+    },
     series: [{
       type: 'bar',
-      data: allModels.map(m => ({ value: m.value, itemStyle: { color: m.color, borderRadius: [0, 4, 4, 0] } })).reverse(),
-      label: { show: true, position: 'right', color: '#e5e7eb', formatter: (p) => (p.value * 100).toFixed(1) + '%' },
+      data: barData,
+      barWidth: (val) => {
+        // Dividers get zero-width (they're just labels)
+        return undefined; // let ECharts auto-size
+      },
     }],
   });
 }
