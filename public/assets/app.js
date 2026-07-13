@@ -228,7 +228,20 @@ function renderDashboardSummary(a) {
     : ` Best regression: <b>${bestRegName}</b> (${pct(bestReg.hit_rate)}, ${(-diff).toFixed(1)}pp below mean).`);
   const clsStr = bestCls ? ` Best classifier: <b>${bestClsName}</b> (${pct(bestCls.accuracy)} accuracy).` : '';
 
-  // Build KPI strip HTML
+  // Build KPI strip HTML — with explicit winner badge
+  const isOurWin = bestReg && bestRegName === 'ridge_s2';
+  const winnerBadge = bestReg
+    ? (isOurWin
+        ? `<span class="winner-badge win">OUR MODEL WINS</span>`
+        : bestRegName === 'mean'
+          ? `<span class="winner-badge neutral">BASELINE WINS</span>`
+          : `<span class="winner-badge neutral">${bestRegName.toUpperCase()} WINS</span>`)
+    : '';
+  // Map internal model names to display names
+  const modelDisplayName = { ridge_s2: 'Our model', ridge_baseline: 'Baseline (no S2)', knn: 'kNN', mean: 'Mean baseline' };
+  const bestRegDisplay = modelDisplayName[bestRegName] || bestRegName;
+  const bestClsDisplay = { logistic: 'Logistic', knn: 'kNN', naive_bayes: 'Naive Bayes', majority: 'Majority' }[bestClsName] || bestClsName;
+
   const kpiHtml = `
     <div class="kpi-strip" id="kpiStrip">
       <div class="kpi-item ${v.cls}">
@@ -243,15 +256,18 @@ function renderDashboardSummary(a) {
         <span class="kpi-label">Points</span>
         <b class="kpi-value">${a.series.n_points.toLocaleString()}</b>
       </div>
-      <div class="kpi-item">
+      <div class="kpi-item ${isOurWin ? 'ok' : 'warn'}">
         <span class="kpi-label">Best regression</span>
         <b class="kpi-value">${bestReg ? pct(bestReg.hit_rate, 0) : '—'}</b>
+        <span class="kpi-sub">${bestRegDisplay || '—'}</span>
       </div>
       <div class="kpi-item">
         <span class="kpi-label">Best classifier</span>
         <b class="kpi-value">${bestCls ? pct(bestCls.accuracy, 0) : '—'}</b>
+        <span class="kpi-sub">${bestClsDisplay || '—'}</span>
       </div>
-    </div>`;
+    </div>
+    ${winnerBadge}`;
 
   return `<p>Read <b>${a.series.n_points.toLocaleString()}</b> points from <b>${esc(a.series.label || '')}</b>. Signal: <b>${esc(v.text)}</b> (fit quality ${pct(a.fit.r2, 1)}).${diffStr}${clsStr} Dashboard updated.</p>${kpiHtml}`;
 }
@@ -449,19 +465,21 @@ function renderSeriesTab(chart) {
 function renderPredictionsTab(chart) {
   const a = state.analysis;
   const ml = a.ml;
-  if (!ml || ml.error || !ml.model_testIdx) {
+  const reg = ml?.regression || {};
+  // After the universal predictor refactor, test data lives under ml.regression
+  if (!ml || reg.error || !reg.model_testIdx) {
     chart.setOption({ title: { text: 'No predictions available — series too short for ML', left: 'center', top: 'center', textStyle: { color: '#8b97ad' } } });
     return;
   }
   const values = a.series.values;
   // Build actual values for the test period + the forward forecast
-  const testData = ml.model_testIdx.map((idx, i) => [idx + ml.horizon, values[idx + ml.horizon]]);
-  const modelPredData = ml.model_testIdx.map((idx, i) => [idx + ml.horizon, values[idx] * (1 + ml.model_testPreds[i])]);
-  const baselinePredData = ml.model_testIdx.map((idx, i) => [idx + ml.horizon, values[idx] * (1 + ml.baseline_testPreds[i])]);
+  const testData = reg.model_testIdx.map((idx, i) => [idx + ml.horizon, values[idx + ml.horizon]]);
+  const modelPredData = reg.model_testIdx.map((idx, i) => [idx + ml.horizon, values[idx] * (1 + reg.model_testPreds[i])]);
+  const baselinePredData = reg.model_testIdx.map((idx, i) => [idx + ml.horizon, values[idx] * (1 + reg.baseline_testPreds[i])]);
   // Forward forecast — single point at end
   const lastIdx = values.length - 1;
   const fwdIdx = lastIdx + ml.horizon;
-  const fwdValue = values[lastIdx] * (1 + ml.model_next_return);
+  const fwdValue = values[lastIdx] * (1 + reg.model_next_return);
   chart.setOption({
     ...commonChartOpts(true),
     title: { text: `Predictions — test set + ${ml.horizon}-step forward forecast`, left: 8, top: 0, textStyle: { color: '#8b97ad', fontSize: 12, fontWeight: 500 } },
@@ -474,7 +492,7 @@ function renderPredictionsTab(chart) {
       {
         name: 'forward forecast', type: 'effectScatter', data: [[fwdIdx, fwdValue]], symbolSize: 14,
         itemStyle: { color: '#34d399', shadowBlur: 12, shadowColor: '#34d399' },
-        tooltip: { formatter: () => `forward forecast (${ml.horizon} steps ahead)<br/>value: ${fmt(fwdValue, 4)}<br/>predicted return: ${pct(ml.model_next_return, 3)}` },
+        tooltip: { formatter: () => `forward forecast (${ml.horizon} steps ahead)<br/>value: ${fmt(fwdValue, 4)}<br/>predicted return: ${pct(reg.model_next_return, 3)}` },
       },
     ],
   });
