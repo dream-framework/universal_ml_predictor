@@ -205,74 +205,73 @@ function renderDashboardSummary(a) {
   const reg = ml.regression || {};
   const cls = ml.classification || {};
 
-  // ── Use the SAME clean model list as the matchup tab ──
-  // Only the 4 named models, not the backward-compat flat fields
+  // ── Model lists ──
   const regModels = !reg.error ? [
-    { key: 'ridge_s2_dust', name: 'Our model + dust', hit: reg.ridge_s2_dust?.hit_rate },
-    { key: 'ridge_s2',      name: 'Our model (S2)',  hit: reg.ridge_s2?.hit_rate },
-    { key: 'ridge_baseline', name: 'Baseline',        hit: reg.ridge_baseline?.hit_rate },
-    { key: 'knn',            name: 'kNN',             hit: reg.knn?.hit_rate },
-    { key: 'mean',           name: 'Mean baseline',   hit: reg.mean?.hit_rate },
+    { key: 'ridge_s2_dust', name: 'Our + dust',  hit: reg.ridge_s2_dust?.hit_rate, ours: true },
+    { key: 'ridge_s2',      name: 'Our (S2)',    hit: reg.ridge_s2?.hit_rate,      ours: true },
+    { key: 'ridge_baseline', name: 'Baseline',   hit: reg.ridge_baseline?.hit_rate, ours: false },
+    { key: 'knn',            name: 'kNN',        hit: reg.knn?.hit_rate,            ours: false },
+    { key: 'mean',           name: 'Mean',       hit: reg.mean?.hit_rate,           ours: false },
   ].filter(m => m.hit != null) : [];
 
   const clsModels = !cls.error && cls.models ? [
-    { key: 'logistic',    name: 'Our model',  acc: cls.models.logistic?.accuracy },
-    { key: 'naive_bayes', name: 'Naive Bayes', acc: cls.models.naive_bayes?.accuracy },
-    { key: 'knn',         name: 'kNN',         acc: cls.models.knn?.accuracy },
-    { key: 'majority',    name: 'Majority',    acc: cls.models.majority?.accuracy },
+    { key: 'logistic',    name: 'Our model',  acc: cls.models.logistic?.accuracy,    ours: true },
+    { key: 'naive_bayes', name: 'Naive Bayes', acc: cls.models.naive_bayes?.accuracy, ours: false },
+    { key: 'knn',         name: 'kNN',        acc: cls.models.knn?.accuracy,         ours: false },
+    { key: 'majority',    name: 'Majority',   acc: cls.models.majority?.accuracy,    ours: false },
   ].filter(m => m.acc != null) : [];
 
-  const bestReg = regModels.length ? regModels.reduce((a, b) => a.hit > b.hit ? a : b) : null;
-  const bestCls = clsModels.length ? clsModels.reduce((a, b) => a.acc > b.acc ? a : b) : null;
+  // ── Our best vs best alternative ──
+  const ourReg = regModels.filter(m => m.ours).sort((a, b) => b.hit - a.hit)[0] || null;
+  const altReg = regModels.filter(m => !m.ours).sort((a, b) => b.hit - a.hit)[0] || null;
+  const regDelta = (ourReg && altReg) ? (ourReg.hit - altReg.hit) * 100 : null;
+  const regWins = regDelta !== null && regDelta >= 0;
 
-  const isOurWin = bestReg && (bestReg.key === 'ridge_s2' || bestReg.key === 'ridge_s2_dust');
-  const isDustWin = bestReg && bestReg.key === 'ridge_s2_dust';
-  const isOurClsWin = bestCls && bestCls.key === 'logistic';
-  const winnerBadge = bestReg
-    ? (isDustWin
-        ? `<span class="winner-badge win">OUR MODEL + DUST WINS</span>`
-        : isOurWin
-          ? `<span class="winner-badge win">OUR MODEL WINS</span>`
-          : bestReg.key === 'mean'
-            ? `<span class="winner-badge neutral">BASELINE WINS (${bestReg.name})</span>`
-            : `<span class="winner-badge neutral">${bestReg.name.toUpperCase()} WINS</span>`)
+  const ourCls = clsModels.filter(m => m.ours).sort((a, b) => b.acc - a.acc)[0] || null;
+  const altCls = clsModels.filter(m => !m.ours).sort((a, b) => b.acc - a.acc)[0] || null;
+  const clsDelta = (ourCls && altCls) ? (ourCls.acc - altCls.acc) * 100 : null;
+  const clsWins = clsDelta !== null && clsDelta >= 0;
+
+  // ── Winner badge ──
+  const winnerBadge = ourReg
+    ? (regWins
+        ? `<span class="winner-badge win">OUR MODEL WINS (+${regDelta.toFixed(1)}pp)</span>`
+        : `<span class="winner-badge neutral">BASELINE WINS (${(-regDelta).toFixed(1)}pp)</span>`)
     : '';
 
-  const diff = bestReg ? (bestReg.hit - (reg.mean?.hit_rate || 0)) * 100 : null;
-  const diffStr = diff === null ? '' : (diff >= 0
-    ? ` Best regression: <b>${bestReg.name}</b> (${pct(bestReg.hit)}, +${diff.toFixed(1)}pp vs mean).`
-    : ` Best regression: <b>${bestReg.name}</b> (${pct(bestReg.hit)}, ${(-diff).toFixed(1)}pp below mean).`);
-  const clsStr = bestCls ? ` Best classifier: <b>${bestCls.name}</b> (${pct(bestCls.acc)} accuracy).` : '';
+  // ── KPI cards with win/loss % ──
+  const regCardClass = regWins ? 'ok' : 'warn';
+  const clsCardClass = clsWins ? 'ok' : 'warn';
+  const regDeltaStr = regDelta !== null
+    ? (regWins ? `+${regDelta.toFixed(1)}pp` : `${regDelta.toFixed(1)}pp`)
+    : '—';
+  const clsDeltaStr = clsDelta !== null
+    ? (clsWins ? `+${clsDelta.toFixed(1)}pp` : `${clsDelta.toFixed(1)}pp`)
+    : '—';
 
-  // Build KPI strip HTML
   const kpiHtml = `
     <div class="kpi-strip" id="kpiStrip">
       <div class="kpi-item ${v.cls}">
         <span class="kpi-label">Signal</span>
         <b class="kpi-value">${esc(v.text)}</b>
+        <span class="kpi-sub">${pct(a.fit.r2, 0)} fit · ${a.series.n_points.toLocaleString()} pts</span>
       </div>
-      <div class="kpi-item">
-        <span class="kpi-label">Fit quality</span>
-        <b class="kpi-value">${pct(a.fit.r2, 0)}</b>
+      <div class="kpi-item ${regCardClass}">
+        <span class="kpi-label">Regression · our vs best alt</span>
+        <b class="kpi-value">${ourReg ? pct(ourReg.hit, 0) : '—'}</b>
+        <span class="kpi-sub">${ourReg?.name || '—'} vs ${altReg?.name || '—'}</span>
+        <span class="kpi-delta ${regWins ? 'win' : 'lose'}">${regDeltaStr}</span>
       </div>
-      <div class="kpi-item">
-        <span class="kpi-label">Points</span>
-        <b class="kpi-value">${a.series.n_points.toLocaleString()}</b>
-      </div>
-      <div class="kpi-item ${isOurWin ? 'ok' : 'warn'}">
-        <span class="kpi-label">Best regression</span>
-        <b class="kpi-value">${bestReg ? pct(bestReg.hit, 0) : '—'}</b>
-        <span class="kpi-sub">${bestReg?.name || '—'}</span>
-      </div>
-      <div class="kpi-item ${isOurClsWin ? 'ok' : ''}">
-        <span class="kpi-label">Best classifier</span>
-        <b class="kpi-value">${bestCls ? pct(bestCls.acc, 0) : '—'}</b>
-        <span class="kpi-sub">${bestCls?.name || '—'}</span>
+      <div class="kpi-item ${clsCardClass}">
+        <span class="kpi-label">Classifier · our vs best alt</span>
+        <b class="kpi-value">${ourCls ? pct(ourCls.acc, 0) : '—'}</b>
+        <span class="kpi-sub">${ourCls?.name || '—'} vs ${altCls?.name || '—'}</span>
+        <span class="kpi-delta ${clsWins ? 'win' : 'lose'}">${clsDeltaStr}</span>
       </div>
     </div>
     ${winnerBadge}`;
 
-  return `<p>Read <b>${a.series.n_points.toLocaleString()}</b> points from <b>${esc(a.series.label || '')}</b>. Signal: <b>${esc(v.text)}</b> (fit quality ${pct(a.fit.r2, 1)}).${diffStr}${clsStr} Dashboard updated.</p>${kpiHtml}`;
+  return `<p>Read <b>${a.series.n_points.toLocaleString()}</b> points from <b>${esc(a.series.label || '')}</b>. Signal: <b>${esc(v.text)}</b> (fit quality ${pct(a.fit.r2, 1)}). Dashboard updated.</p>${kpiHtml}`;
 }
 
 // ── Dashboard rendering ───────────────────────────────────────────────────
