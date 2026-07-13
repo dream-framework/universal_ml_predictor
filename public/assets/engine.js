@@ -119,6 +119,50 @@ function s2Features(values, lambdaGrid = [1, 2, 4, 8, 16, 32, 64, 128, 256]) {
   });
 }
 
+// S2 + Dust features: same 9 features as s2Features PLUS 5 dust-specific features
+// computed on the same rolling window. This is the "enhanced" model that uses
+// the two-component (ridge + dust) decomposition to capture both regimes.
+function s2DustFeatures(values, lambdaGrid = [1, 2, 4, 8, 16, 32, 64, 128, 256]) {
+  const base = baselineFeatures(values);
+  return base.map((b, i) => {
+    if (!b) return null;
+    const window = values.slice(Math.max(0, i - 59), i + 1);
+    if (window.length < 30) return [...b, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // Standard S2 features
+    const curve = computeRetentionCurve(window, lambdaGrid);
+    const R5 = curve.find(c => c.lambda === 5)?.R ?? 0;
+    const R20 = curve.find(c => c.lambda === 20)?.R ?? 0;
+    const R60 = curve.find(c => c.lambda === 60)?.R ?? 0;
+    const fit = fitS2(curve);
+    // Dust-specific features: decompose the window into ridge + dust
+    const ridgeScale = Math.max(1, Math.round(fit.lambda_q || 5));
+    const ridge = gaussianSmooth(window, ridgeScale);
+    const dust = window.map((v, j) => v - (ridge[j] || 0));
+    // Fit S2 to dust's own retention curve
+    const dustCurve = computeRetentionCurve(dust, lambdaGrid);
+    const dustFit = fitS2(dustCurve);
+    // Dust density: local energy in a small window
+    const dw = Math.max(3, Math.floor(window.length / 10));
+    let dustEnergy = 0, dustCount = 0;
+    for (let j = Math.max(0, window.length - dw); j < window.length; j++) {
+      dustEnergy += dust[j] * dust[j];
+      dustCount++;
+    }
+    const dustDensity = dustCount > 0 ? dustEnergy / dustCount : 0;
+    // Dust/ridge ratio: how much of the signal is dust vs ridge
+    const ridgeEnergy = ridge.reduce((a, b) => a + b * b, 0) / ridge.length;
+    const dustRatio = ridgeEnergy > 0 ? (dust.reduce((a, b) => a + b * b, 0) / dust.length) / ridgeEnergy : 0;
+    // 14 features total: 5 baseline + 4 S2 + 5 dust
+    return [...b, R5, R20, R60, fit.D || 0,
+      dustFit.D || 0,           // dust stretching exponent
+      dustFit.lambda_q || 0,    // dust retention scale
+      dustFit.r2 || 0,          // dust S2 fit quality
+      dustDensity,               // local dust energy
+      dustRatio,                 // dust/ridge energy ratio
+    ];
+  });
+}
+
 function ridgeFit(X, y, lambda = 1.0) {
   const n = X.length;
   if (n === 0) return null;
@@ -396,6 +440,47 @@ function runClassification(values, horizon, useS2features = true) {
 }
 
 // kNN regression
+// Ridge regression with S2 + Dust features (14 features: 5 baseline + 4 S2 + 5 dust)
+// This is the enhanced model that uses the two-component decomposition.
+function runPredictionDust(values, horizon) {
+  const n = values.length;
+  if (n < 60) throw new Error(`Need at least 60 points, got ${n}`);
+  const features = s2DustFeatures(values);
+  const X = [], y = [], idxAll = [];
+  for (let i = 0; i < n - horizon; i++) {
+    if (!features[i]) continue;
+    const v0 = values[i], vh = values[i + horizon];
+    if (v0 === 0 || !Number.isFinite(vh)) continue;
+    X.push(features[i]);
+    y.push((vh - v0) / v0);
+    idxAll.push(i);
+  }
+  if (X.length < 30) throw new Error('Not enough feature rows for dust model');
+  const split = Math.floor(X.length * 0.8);
+  const model = ridgeFit(X.slice(0, split), y.slice(0, split), 1.0);
+  const testPreds = X.slice(split).map(x => ridgePredict(model, x));
+  const testY = y.slice(split);
+  const testIdx = idxAll.slice(split);
+  let mae = 0, hitCount = 0;
+  for (let i = 0; i < testPreds.length; i++) {
+    mae += Math.abs(testPreds[i] - testY[i]);
+    if (Math.sign(testPreds[i]) === Math.sign(testY[i])) hitCount++;
+  }
+  mae = testPreds.length > 0 ? mae / testPreds.length : NaN;
+  const hitRate = testPreds.length > 0 ? hitCount / testPreds.length : NaN;
+  const lastIdx = features.filter(Boolean).length - 1;
+  const lastFeatRow = features.filter(Boolean)[lastIdx];
+  const nextPred = ridgePredict(model, lastFeatRow);
+  return {
+    horizon,
+    next_return_prediction: nextPred,
+    mae, hit_rate: hitRate,
+    n_test: testPreds.length,
+    n_train: split,
+    testIdx, testPreds, testY,
+  };
+}
+
 function runKnnRegression(values, horizon, useS2features = true, k = 5) {
   const n = values.length;
   const features = useS2features ? s2Features(values) : baselineFeatures(values);
@@ -574,10 +659,12 @@ function analyzeSeries(points, label, unit, source) {
     // Regression models
     const ridgeS2 = runPrediction(values, horizon, true);
     const ridgeBaseline = runPrediction(values, horizon, false);
+    const ridgeS2Dust = runPredictionDust(values, horizon);
     const knnReg = runKnnRegression(values, horizon, true);
     const meanBase = runMeanBaseline(values, horizon);
     ml.regression = {
       ridge_s2: { next_return: ridgeS2.next_return_prediction, hit_rate: ridgeS2.hit_rate, mae: ridgeS2.mae, n_test: ridgeS2.n_test },
+      ridge_s2_dust: { next_return: ridgeS2Dust.next_return_prediction, hit_rate: ridgeS2Dust.hit_rate, mae: ridgeS2Dust.mae, n_test: ridgeS2Dust.n_test },
       ridge_baseline: { next_return: ridgeBaseline.next_return_prediction, hit_rate: ridgeBaseline.hit_rate, mae: ridgeBaseline.mae, n_test: ridgeBaseline.n_test },
       knn: { next_return: knnReg.next_return_prediction, hit_rate: knnReg.hit_rate, mae: knnReg.mae, n_test: knnReg.n_test },
       mean: { next_return: meanBase.next_return_prediction, hit_rate: meanBase.hit_rate, mae: meanBase.mae, n_test: meanBase.n_test },
