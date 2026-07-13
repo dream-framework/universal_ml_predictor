@@ -1005,11 +1005,30 @@ async function loadFeeds() {
   }
 }
 
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('predictor_theme', next);
+  $('themeBtn').textContent = next === 'dark' ? '🌙' : '☀️';
+  setTimeout(() => {
+    Object.values(state.charts).forEach(c => c && c.resize());
+    if (state.fsChart) state.fsChart.resize();
+    if (state.analysis) renderActiveTab();
+  }, 50);
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 function init() {
   wireDropzone();
   wireTabs();
-  loadFeeds();  // async, populates the dropdown
+  loadFeeds();
+  // Theme button
+  const savedTheme = localStorage.getItem('predictor_theme') || 'dark';
+  $('themeBtn').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+  $('themeBtn').addEventListener('click', toggleTheme);
   $('sendBtn').addEventListener('click', send);
   $('chatInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
