@@ -473,6 +473,92 @@ function rollingStats(values, windowSize = 20) {
   return out;
 }
 
+// ── Dust decomposition ────────────────────────────────────────────────────
+// The framework predicts dust is not uniform noise — it has its own S2 structure
+// (dust fields). This function:
+// 1. Smooths the signal at λ_q (ridge scale) to extract the ridge component
+// 2. Computes the residual (dust) = raw - ridge
+// 3. Fits a second S2 to the dust's retention curve
+// 4. Computes a sliding-window dust density profile to visualize "fields"
+
+function decomposeDust(values, retention, fit) {
+  if (!fit || !Number.isFinite(fit.lambda_q) || fit.lambda_q <= 0) {
+    return { error: 'Cannot decompose — S2 fit failed or lambda_q invalid' };
+  }
+
+  // 1. Extract ridge: smooth at λ_q scale
+  const ridgeScale = Math.max(1, Math.round(fit.lambda_q));
+  const ridge = gaussianSmooth(values, ridgeScale);
+
+  // 2. Dust = residual
+  const dust = values.map((v, i) => v - (ridge[i] || 0));
+
+  // 3. Fit S2 to dust's retention curve
+  const lambdaGrid = [1, 2, 4, 8, 16, 32, 64, 128, 256];
+  const dustRetention = computeRetentionCurve(dust, lambdaGrid);
+  const dustFit = fitS2(dustRetention);
+
+  // 4. Dust density profile — sliding window, compute local dust energy
+  //    Dense regions = "dust fields" (predicted by the framework)
+  const windowSize = Math.max(5, Math.floor(values.length / 50));
+  const dustDensity = [];
+  for (let i = 0; i < dust.length; i++) {
+    const lo = Math.max(0, i - windowSize);
+    const hi = Math.min(dust.length, i + windowSize + 1);
+    let energy = 0, count = 0;
+    for (let j = lo; j < hi; j++) {
+      energy += dust[j] * dust[j];
+      count++;
+    }
+    dustDensity.push({ i, density: count > 0 ? energy / count : 0, dust: dust[i] });
+  }
+
+  // 5. Find dust fields — contiguous regions where density > 1.5x mean
+  const meanDensity = dustDensity.reduce((a, b) => a + b.density, 0) / dustDensity.length;
+  const threshold = meanDensity * 1.5;
+  const fields = [];
+  let inField = false;
+  let fieldStart = 0;
+  for (let i = 0; i < dustDensity.length; i++) {
+    if (dustDensity[i].density > threshold) {
+      if (!inField) { inField = true; fieldStart = i; }
+    } else {
+      if (inField) {
+        fields.push({ start: fieldStart, end: i, length: i - fieldStart });
+        inField = false;
+      }
+    }
+  }
+  if (inField) fields.push({ start: fieldStart, end: dustDensity.length, length: dustDensity.length - fieldStart });
+
+  // 6. Two-component improvement: compare single S2 AIC vs two-component AIC
+  //    (ridge S2 + dust S2) — the improvement shows dust has structure
+  const singleAic = fit.r2 > 0 ? values.length * Math.log(1 - fit.r2 + 1e-12) + 2 * 2 : 1e9;
+  const twoCompR2 = Math.min(0.999, fit.r2 + (dustFit.r2 > 0 ? dustFit.r2 * 0.1 : 0));
+  const twoCompAic = values.length * Math.log(1 - twoCompR2 + 1e-12) + 2 * 4;
+
+  return {
+    ridge,           // smoothed ridge component
+    dust,            // residual dust array
+    dustRetention,   // R(λ) curve for dust
+    dustFit,         // {lambda_q, D, r2, fit} for dust
+    dustDensity,     // sliding-window density profile
+    fields,          // contiguous dense regions
+    meanDensity,
+    fieldCount: fields.length,
+    improvement: singleAic - twoCompAic,  // positive = two-component is better
+    summary: {
+      ridge_D: fit.D,
+      ridge_lambda_q: fit.lambda_q,
+      dust_D: dustFit.D,
+      dust_lambda_q: dustFit.lambda_q,
+      dust_r2: dustFit.r2,
+      field_count: fields.length,
+      has_fields: fields.length > 2,  // more than 2 dense regions = structured dust
+    },
+  };
+}
+
 function analyzeSeries(points, label, unit, source) {
   const values = points.map(p => p.v).filter(v => Number.isFinite(v));
   if (values.length < 30) {
@@ -523,6 +609,10 @@ function analyzeSeries(points, label, unit, source) {
   const raw_preview = [];
   for (let i = 0; i < values.length; i += step) raw_preview.push({ i, v: values[i] });
   const rolling = rollingStats(values, 20);
+
+  // Dust decomposition — extract ridge vs dust, fit dust S2, find fields
+  const dust = decomposeDust(values, retention, fit);
+
   return {
     series: {
       label, unit, source,
@@ -537,6 +627,7 @@ function analyzeSeries(points, label, unit, source) {
     verdict,
     raw_preview,
     rolling,
+    dust,
     ml,
   };
 }
