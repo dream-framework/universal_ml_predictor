@@ -259,6 +259,11 @@ function renderDashboardSummary(a) {
 // ── Dashboard rendering ───────────────────────────────────────────────────
 function renderDashboard() {
   if (!state.analysis) return;
+  // Dispose old chart instances — they're attached to the old #chartHost which
+  // we're about to replace. Without this, the old instances are orphaned and
+  // renderActiveTab() reuses them instead of creating new ones on the new container.
+  Object.values(state.charts).forEach(c => { try { c && c.dispose(); } catch(e) {} });
+  state.charts = {};
   $('dashboard').innerHTML = '<div class="chart-host" id="chartHost"></div>';
   renderActiveTab();
 }
