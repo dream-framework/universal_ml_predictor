@@ -1,38 +1,33 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Predictor · Paste data, get a dazzling readout</title>
   <meta name="description" content="Paste a link to a time series or drop a file. The bot reads it, benchmarks our model, and shows you dazzling charts — all in your browser." />
-  <link rel="stylesheet" href="./assets/style.css?v=20260713-fix1" />
+  <link rel="stylesheet" href="./assets/style.css?v=20260713-theme1" />
+  <script>
+    // Set theme before render to avoid flash
+    (function() {
+      var t = localStorage.getItem('predictor_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
 </head>
 <body>
   <div class="app">
-    <!-- ═══ TOP BAR ════════════════════════════════════════════════════ -->
+    <!-- ═══ COMPACT TOP BAR ══════════════════════════════════════════════ -->
     <header class="topbar">
       <div class="brand">
         <span class="logo">●</span>
-        <div>
-          <div class="brand-name">Predictor</div>
-          <div class="brand-sub">paste data · get a readout</div>
-        </div>
+        <span class="brand-name">Predictor</span>
+        <span class="brand-sub">paste data · get a readout</span>
       </div>
       <div class="top-actions">
         <div class="status-chip" id="statusChip"><span class="dot"></span><b id="statusText">checking</b></div>
+        <button id="themeBtn" type="button" class="ghost-btn-sm" title="Toggle theme">🌙</button>
       </div>
     </header>
-
-    <!-- ═══ HERO ═══════════════════════════════════════════════════════ -->
-    <section class="hero">
-      <h1>Paste data. Get a dazzling readout.</h1>
-      <p class="hero-sub">
-        Drop in any time series — a stock feed, a sensor log, a CSV of weekly sales.
-        The bot reads it, benchmarks our model against established forecasting frameworks,
-        and shows you five interactive charts. All in your browser, nothing leaves your machine
-        except the URL you paste.
-      </p>
-    </section>
 
     <!-- ═══ MAIN: CHAT (LEFT) + DASHBOARD (RIGHT) ═══════════════════════ -->
     <section class="main-grid">
@@ -89,7 +84,7 @@
       <div class="dashboard-panel">
         <div class="panel-head">
           <h2>Dashboard</h2>
-          <p id="dashSubtitle">Five views of your signal. Updates with every analysis.</p>
+          <p id="dashSubtitle">Six views of your signal. Updates with every analysis.</p>
         </div>
         <div class="dash-tabs">
           <button class="dash-tab active" type="button" data-dash="series">📈 Series</button>
@@ -107,11 +102,6 @@
         </div>
       </div>
     </section>
-
-    <!-- ═══ FOOTER ══════════════════════════════════════════════════════ -->
-    <footer class="footer">
-      <span>Static site on GitHub Pages · Groq proxy on Render · shared key never exposed to visitors.</span>
-    </footer>
   </div>
 
   <!-- ═══ HISTORY MODAL ═════════════════════════════════════════════════ -->
@@ -160,10 +150,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-  <script src="./assets/engine.js?v=20260713-fix1"></script>
-  <script src="./assets/adapters.js?v=20260713-fix1"></script>
-  <script src="./assets/groq.js?v=20260713-fix1"></script>
-  <script src="./assets/registry.js?v=20260713-fix1"></script>
-  <script src="./assets/app.js?v=20260713-fix1"></script>
+  <script src="./assets/engine.js?v=20260713-theme1"></script>
+  <script src="./assets/adapters.js?v=20260713-theme1"></script>
+  <script src="./assets/groq.js?v=20260713-theme1"></script>
+  <script src="./assets/registry.js?v=20260713-theme1"></script>
+  <script src="./assets/app.js?v=20260713-theme1"></script>
 </body>
 </html>
