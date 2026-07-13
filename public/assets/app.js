@@ -205,43 +205,42 @@ function renderDashboardSummary(a) {
   const reg = ml.regression || {};
   const cls = ml.classification || {};
 
-  // Find best regression model
-  let bestReg = null, bestRegName = '';
-  if (!reg.error) {
-    for (const [name, m] of Object.entries(reg)) {
-      if (typeof m !== 'object' || !m || m.hit_rate == null) continue;
-      if (!bestReg || m.hit_rate > bestReg.hit_rate) { bestReg = m; bestRegName = name; }
-    }
-  }
-  // Find best classification model
-  let bestCls = null, bestClsName = '';
-  if (!cls.error && cls.models) {
-    for (const [name, m] of Object.entries(cls.models)) {
-      if (name === 'next_prediction' || !m || m.accuracy == null) continue;
-      if (!bestCls || m.accuracy > bestCls.accuracy) { bestCls = m; bestClsName = name; }
-    }
-  }
+  // ── Use the SAME clean model list as the matchup tab ──
+  // Only the 4 named models, not the backward-compat flat fields
+  const regModels = !reg.error ? [
+    { key: 'ridge_s2',       name: 'Our model',     hit: reg.ridge_s2?.hit_rate },
+    { key: 'ridge_baseline', name: 'Baseline',      hit: reg.ridge_baseline?.hit_rate },
+    { key: 'knn',            name: 'kNN',           hit: reg.knn?.hit_rate },
+    { key: 'mean',           name: 'Mean baseline', hit: reg.mean?.hit_rate },
+  ].filter(m => m.hit != null) : [];
 
-  const diff = bestReg ? (bestReg.hit_rate - (reg.mean?.hit_rate || 0)) * 100 : null;
-  const diffStr = diff === null ? '' : (diff >= 0
-    ? ` Best regression model: <b>${bestRegName}</b> (${pct(bestReg.hit_rate)}, +${diff.toFixed(1)}pp vs mean baseline).`
-    : ` Best regression: <b>${bestRegName}</b> (${pct(bestReg.hit_rate)}, ${(-diff).toFixed(1)}pp below mean).`);
-  const clsStr = bestCls ? ` Best classifier: <b>${bestClsName}</b> (${pct(bestCls.accuracy)} accuracy).` : '';
+  const clsModels = !cls.error && cls.models ? [
+    { key: 'logistic',    name: 'Our model',  acc: cls.models.logistic?.accuracy },
+    { key: 'naive_bayes', name: 'Naive Bayes', acc: cls.models.naive_bayes?.accuracy },
+    { key: 'knn',         name: 'kNN',         acc: cls.models.knn?.accuracy },
+    { key: 'majority',    name: 'Majority',    acc: cls.models.majority?.accuracy },
+  ].filter(m => m.acc != null) : [];
 
-  // Build KPI strip HTML — with explicit winner badge
-  const isOurWin = bestReg && bestRegName === 'ridge_s2';
+  const bestReg = regModels.length ? regModels.reduce((a, b) => a.hit > b.hit ? a : b) : null;
+  const bestCls = clsModels.length ? clsModels.reduce((a, b) => a.acc > b.acc ? a : b) : null;
+
+  const isOurWin = bestReg && bestReg.key === 'ridge_s2';
+  const isOurClsWin = bestCls && bestCls.key === 'logistic';
   const winnerBadge = bestReg
     ? (isOurWin
         ? `<span class="winner-badge win">OUR MODEL WINS</span>`
-        : bestRegName === 'mean'
-          ? `<span class="winner-badge neutral">BASELINE WINS</span>`
-          : `<span class="winner-badge neutral">${bestRegName.toUpperCase()} WINS</span>`)
+        : bestReg.key === 'mean'
+          ? `<span class="winner-badge neutral">BASELINE WINS (${bestReg.name})</span>`
+          : `<span class="winner-badge neutral">${bestReg.name.toUpperCase()} WINS</span>`)
     : '';
-  // Map internal model names to display names
-  const modelDisplayName = { ridge_s2: 'Our model', ridge_baseline: 'Baseline (no S2)', knn: 'kNN', mean: 'Mean baseline' };
-  const bestRegDisplay = modelDisplayName[bestRegName] || bestRegName;
-  const bestClsDisplay = { logistic: 'Logistic', knn: 'kNN', naive_bayes: 'Naive Bayes', majority: 'Majority' }[bestClsName] || bestClsName;
 
+  const diff = bestReg ? (bestReg.hit - (reg.mean?.hit_rate || 0)) * 100 : null;
+  const diffStr = diff === null ? '' : (diff >= 0
+    ? ` Best regression: <b>${bestReg.name}</b> (${pct(bestReg.hit)}, +${diff.toFixed(1)}pp vs mean).`
+    : ` Best regression: <b>${bestReg.name}</b> (${pct(bestReg.hit)}, ${(-diff).toFixed(1)}pp below mean).`);
+  const clsStr = bestCls ? ` Best classifier: <b>${bestCls.name}</b> (${pct(bestCls.acc)} accuracy).` : '';
+
+  // Build KPI strip HTML
   const kpiHtml = `
     <div class="kpi-strip" id="kpiStrip">
       <div class="kpi-item ${v.cls}">
@@ -258,13 +257,13 @@ function renderDashboardSummary(a) {
       </div>
       <div class="kpi-item ${isOurWin ? 'ok' : 'warn'}">
         <span class="kpi-label">Best regression</span>
-        <b class="kpi-value">${bestReg ? pct(bestReg.hit_rate, 0) : '—'}</b>
-        <span class="kpi-sub">${bestRegDisplay || '—'}</span>
+        <b class="kpi-value">${bestReg ? pct(bestReg.hit, 0) : '—'}</b>
+        <span class="kpi-sub">${bestReg?.name || '—'}</span>
       </div>
-      <div class="kpi-item">
+      <div class="kpi-item ${isOurClsWin ? 'ok' : ''}">
         <span class="kpi-label">Best classifier</span>
-        <b class="kpi-value">${bestCls ? pct(bestCls.accuracy, 0) : '—'}</b>
-        <span class="kpi-sub">${bestClsDisplay || '—'}</span>
+        <b class="kpi-value">${bestCls ? pct(bestCls.acc, 0) : '—'}</b>
+        <span class="kpi-sub">${bestCls?.name || '—'}</span>
       </div>
     </div>
     ${winnerBadge}`;
