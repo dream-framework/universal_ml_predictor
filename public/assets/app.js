@@ -208,10 +208,11 @@ function renderDashboardSummary(a) {
   // ── Use the SAME clean model list as the matchup tab ──
   // Only the 4 named models, not the backward-compat flat fields
   const regModels = !reg.error ? [
-    { key: 'ridge_s2',       name: 'Our model',     hit: reg.ridge_s2?.hit_rate },
-    { key: 'ridge_baseline', name: 'Baseline',      hit: reg.ridge_baseline?.hit_rate },
-    { key: 'knn',            name: 'kNN',           hit: reg.knn?.hit_rate },
-    { key: 'mean',           name: 'Mean baseline', hit: reg.mean?.hit_rate },
+    { key: 'ridge_s2_dust', name: 'Our model + dust', hit: reg.ridge_s2_dust?.hit_rate },
+    { key: 'ridge_s2',      name: 'Our model (S2)',  hit: reg.ridge_s2?.hit_rate },
+    { key: 'ridge_baseline', name: 'Baseline',        hit: reg.ridge_baseline?.hit_rate },
+    { key: 'knn',            name: 'kNN',             hit: reg.knn?.hit_rate },
+    { key: 'mean',           name: 'Mean baseline',   hit: reg.mean?.hit_rate },
   ].filter(m => m.hit != null) : [];
 
   const clsModels = !cls.error && cls.models ? [
@@ -224,14 +225,17 @@ function renderDashboardSummary(a) {
   const bestReg = regModels.length ? regModels.reduce((a, b) => a.hit > b.hit ? a : b) : null;
   const bestCls = clsModels.length ? clsModels.reduce((a, b) => a.acc > b.acc ? a : b) : null;
 
-  const isOurWin = bestReg && bestReg.key === 'ridge_s2';
+  const isOurWin = bestReg && (bestReg.key === 'ridge_s2' || bestReg.key === 'ridge_s2_dust');
+  const isDustWin = bestReg && bestReg.key === 'ridge_s2_dust';
   const isOurClsWin = bestCls && bestCls.key === 'logistic';
   const winnerBadge = bestReg
-    ? (isOurWin
-        ? `<span class="winner-badge win">OUR MODEL WINS</span>`
-        : bestReg.key === 'mean'
-          ? `<span class="winner-badge neutral">BASELINE WINS (${bestReg.name})</span>`
-          : `<span class="winner-badge neutral">${bestReg.name.toUpperCase()} WINS</span>`)
+    ? (isDustWin
+        ? `<span class="winner-badge win">OUR MODEL + DUST WINS</span>`
+        : isOurWin
+          ? `<span class="winner-badge win">OUR MODEL WINS</span>`
+          : bestReg.key === 'mean'
+            ? `<span class="winner-badge neutral">BASELINE WINS (${bestReg.name})</span>`
+            : `<span class="winner-badge neutral">${bestReg.name.toUpperCase()} WINS</span>`)
     : '';
 
   const diff = bestReg ? (bestReg.hit - (reg.mean?.hit_rate || 0)) * 100 : null;
@@ -515,11 +519,12 @@ function renderMatchupTab(chart) {
   const C_BASE = '#ff9a4a';      // amber = baseline
   const C_OTHER = '#60a5fa';     // blue = neither (kNN etc.)
 
-  const regModels = ml.regression && !ml.regression.error ? [
-    { name: '★ Our Model (ridge + our features)', hit: ml.regression.ridge_s2?.hit_rate, mae: ml.regression.ridge_s2?.mae, color: C_OUR, group: 'ours' },
-    { name: 'Baseline (ridge, standard features)', hit: ml.regression.ridge_baseline?.hit_rate, mae: ml.regression.ridge_baseline?.mae, color: C_BASE, group: 'baseline' },
-    { name: 'kNN (k=5)', hit: ml.regression.knn?.hit_rate, mae: ml.regression.knn?.mae, color: C_OTHER, group: 'other' },
-    { name: 'Mean baseline', hit: ml.regression.mean?.hit_rate, mae: ml.regression.mean?.mae, color: C_BASE, group: 'baseline' },
+  const regModels = !reg.error ? [
+    { key: 'ridge_s2_dust', name: '★ Our Model + Dust', hit: reg.ridge_s2_dust?.hit_rate, mae: reg.ridge_s2_dust?.mae, color: C_OUR, group: 'ours' },
+    { key: 'ridge_s2',      name: 'Our Model (ridge + S2)', hit: reg.ridge_s2?.hit_rate, mae: reg.ridge_s2?.mae, color: '#22d3ee', group: 'ours' },
+    { key: 'ridge_baseline', name: 'Baseline (ridge, std features)', hit: reg.ridge_baseline?.hit_rate, mae: reg.ridge_baseline?.mae, color: C_BASE, group: 'baseline' },
+    { key: 'knn',            name: 'kNN (k=5)', hit: reg.knn?.hit_rate, mae: reg.knn?.mae, color: C_OTHER, group: 'other' },
+    { key: 'mean',           name: 'Mean baseline', hit: reg.mean?.hit_rate, mae: reg.mean?.mae, color: C_BASE, group: 'baseline' },
   ].filter(m => m.hit != null) : [];
 
   const clsModels = ml.classification && !ml.classification.error ? [
