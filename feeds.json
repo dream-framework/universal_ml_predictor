@@ -1,0 +1,224 @@
+{
+  "schema": "predictor-feeds.v2",
+  "updated": "2026-07-13",
+  "feeds": [
+    {
+      "label": "\ud83c\udf0d USGS Global Earthquakes (30d, hourly)",
+      "domain": "geophysical",
+      "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson",
+      "description": "~720 hourly counts. CORS-open, no key.",
+      "n_points_estimate": 720
+    },
+    {
+      "label": "\ud83c\udf0a USGS Potomac River flow (30d, 5-min)",
+      "domain": "geophysical",
+      "url": "https://waterservices.usgs.gov/nwis/iv/?sites=01646500&parameterCd=00060&startDT=2026-06-13&endDT=2026-07-13&format=json",
+      "description": "~8,600 points at 5-min cadence. CORS-open.",
+      "n_points_estimate": 8600
+    },
+    {
+      "label": "\ud83d\udca7 NOAA Water Level Providence RI (1 day, 6-min)",
+      "domain": "geophysical",
+      "url": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?begin_date=20260712&end_date=20260713&station=8454000&product=water_level&datum=mllw&units=metric&time_zone=gmt&format=json&interval=6",
+      "description": "Tidal water level, ~480 points. CORS-open.",
+      "n_points_estimate": 480
+    },
+    {
+      "label": "\ud83c\udf21\ufe0f Open-Meteo Berlin Temperature (1yr, hourly)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=temperature_2m",
+      "description": "Hourly temperature, ~8,760 points. CORS-open, no key.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\ud83d\udca8 Open-Meteo Berlin Wind Speed (1yr, hourly)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=wind_speed_10m",
+      "description": "Hourly wind speed, ~8,760 points. CORS-open.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\ud83d\udca7 Open-Meteo Berlin Humidity (1yr, hourly)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=relative_humidity_2m",
+      "description": "Hourly relative humidity, ~8,760 points. CORS-open.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\ud83c\udf21\ufe0f Open-Meteo Tokyo Temperature (1yr, hourly)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=35.69&longitude=139.69&start_date=2025-07-01&end_date=2026-07-01&hourly=temperature_2m",
+      "description": "Tokyo hourly temperature, ~8,760 points. CORS-open.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\ud83c\udf21\ufe0f Open-Meteo NYC Temperature (1yr, hourly)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=40.71&longitude=-74.01&start_date=2025-07-01&end_date=2026-07-01&hourly=temperature_2m",
+      "description": "New York hourly temperature, ~8,760 points. CORS-open.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\u20bf Binance BTC/USDT daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=365",
+      "description": "BTC daily closes, ~365 points. CORS-open.",
+      "n_points_estimate": 365
+    },
+    {
+      "label": "\ud83e\ude99 Binance ETH/USDT daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1d&limit=365",
+      "description": "ETH daily closes, ~365 points. CORS-open.",
+      "n_points_estimate": 365
+    },
+    {
+      "label": "\u20bf CoinGecko BTC daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily",
+      "description": "BTC daily closes via CoinGecko, ~366 points. CORS-open.",
+      "n_points_estimate": 366
+    },
+    {
+      "label": "\ud83e\ude99 CoinGecko ETH daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=365&interval=daily",
+      "description": "ETH daily closes via CoinGecko, ~366 points. CORS-open.",
+      "n_points_estimate": 366
+    },
+    {
+      "label": "\u2600\ufe0f NOAA GOES X-ray flux (6h, 1-min)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json",
+      "description": "GOES X-ray flux, ~360 points. CORS-open.",
+      "n_points_estimate": 360
+    },
+    {
+      "label": "\ud83e\uddf2 NOAA GOES Magnetometer (6h, 1-min)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/magnetometers-6-hour.json",
+      "description": "GOES magnetometer (Hp), ~360 points. CORS-open.",
+      "n_points_estimate": 360
+    },
+    {
+      "label": "\u26a1 NOAA GOES Electrons \u22652MeV (6h)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-electrons-6-hour.json",
+      "description": "Integral electron flux, ~70 points. CORS-open.",
+      "n_points_estimate": 70
+    },
+    {
+      "label": "\ud83d\ude80 NOAA GOES Protons \u226510MeV (6h)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/goes/primary/integral-protons-6-hour.json",
+      "description": "Integral proton flux, ~570 points. CORS-open.",
+      "n_points_estimate": 570
+    },
+    {
+      "label": "\ud83c\udf2c\ufe0f NOAA Solar Wind Speed (real-time, 1-min)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
+      "description": "Solar wind proton speed, ~3,000 points. CORS-open.",
+      "n_points_estimate": 3000
+    },
+    {
+      "label": "\ud83e\uddf2 NOAA Planetary K-index (3-hourly)",
+      "domain": "space_weather",
+      "url": "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
+      "description": "Kp index every 3h, ~1,000 points. CORS-open.",
+      "n_points_estimate": 1000
+    },
+    {
+      "label": "\ud83d\udcd6 Wikimedia 'Earth' Pageviews (2.5yr daily)",
+      "domain": "society",
+      "url": "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Earth/daily/20240101/20260713",
+      "description": "Daily pageviews for Wikipedia 'Earth', ~920 points. CORS-open.",
+      "n_points_estimate": 920
+    },
+    {
+      "label": "\ud83c\udfe6 World Bank USA GDP (annual, 65yr)",
+      "domain": "economic",
+      "url": "https://api.worldbank.org/v2/country/USA/indicator/NY.GDP.MKTP.CD?format=json&per_page=100",
+      "description": "US GDP annual, ~65 points. CORS-open.",
+      "n_points_estimate": 65
+    },
+    {
+      "label": "\ud83d\udcb0 World Bank USA CPI (annual, 65yr)",
+      "domain": "economic",
+      "url": "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL?format=json&per_page=100",
+      "description": "US CPI annual, ~65 points. CORS-open.",
+      "n_points_estimate": 65
+    },
+    {
+      "label": "\ud83d\udcc9 World Bank USA Unemployment (annual, 35yr)",
+      "domain": "economic",
+      "url": "https://api.worldbank.org/v2/country/USA/indicator/SL.UEM.TOTL.ZS?format=json&per_page=100",
+      "description": "US unemployment, ~35 points. CORS-open.",
+      "n_points_estimate": 35
+    },
+    {
+      "label": "\ud83c\udf2b\ufe0f Open-Meteo Air Quality PM2.5 Berlin (7d)",
+      "domain": "climate",
+      "url": "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=52.52&longitude=13.41&hourly=pm2_5&past_days=7",
+      "description": "Hourly PM2.5 particulate matter, ~280 points. CORS-open, no key.",
+      "n_points_estimate": 280
+    },
+    {
+      "label": "\ud83c\udf27\ufe0f Open-Meteo Precipitation Berlin (1yr)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=precipitation",
+      "description": "Hourly precipitation, ~8,760 points. CORS-open.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\ud83c\udf31 Open-Meteo Soil Temp Berlin (1yr)",
+      "domain": "climate",
+      "url": "https://archive-api.open-meteo.com/v1/archive?latitude=52.52&longitude=13.41&start_date=2025-07-01&end_date=2026-07-01&hourly=soil_temperature_0_to_7cm",
+      "description": "Hourly soil temperature 0-7cm, ~8,760 points. CORS-open.",
+      "n_points_estimate": 8760
+    },
+    {
+      "label": "\ud83c\udf0a USGS Mississippi River at St. Louis (30d)",
+      "domain": "geophysical",
+      "url": "https://waterservices.usgs.gov/nwis/iv/?sites=07010000&parameterCd=00060&startDT=2026-06-13&endDT=2026-07-13&format=json",
+      "description": "Mississippi River discharge, ~1,400 points at 30-min cadence. CORS-open.",
+      "n_points_estimate": 1400
+    },
+    {
+      "label": "\ud83c\udfde\ufe0f USGS Colorado River at Lees Ferry (30d)",
+      "domain": "geophysical",
+      "url": "https://waterservices.usgs.gov/nwis/iv/?sites=09380000&parameterCd=00060&startDT=2026-06-13&endDT=2026-07-13&format=json",
+      "description": "Colorado River discharge, ~2,865 points. CORS-open.",
+      "n_points_estimate": 2865
+    },
+    {
+      "label": "\ud83c\udf0a USGS Sacramento River (30d)",
+      "domain": "geophysical",
+      "url": "https://waterservices.usgs.gov/nwis/iv/?sites=11447650&parameterCd=00060&startDT=2026-06-13&endDT=2026-07-13&format=json",
+      "description": "Sacramento River discharge, ~2,870 points. CORS-open.",
+      "n_points_estimate": 2870
+    },
+    {
+      "label": "\u25ce Binance SOL/USDT daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=1d&limit=365",
+      "description": "Solana daily closes, ~365 points. CORS-open.",
+      "n_points_estimate": 365
+    },
+    {
+      "label": "\ud83c\udd70\ufe0f Binance ADA/USDT daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.binance.com/api/v3/klines?symbol=ADAUSDT&interval=1d&limit=365",
+      "description": "Cardano daily closes, ~365 points. CORS-open.",
+      "n_points_estimate": 365
+    },
+    {
+      "label": "\ud83d\udd34 Binance DOT/USDT daily (1yr)",
+      "domain": "crypto",
+      "url": "https://api.binance.com/api/v3/klines?symbol=DOTUSDT&interval=1d&limit=365",
+      "description": "Polkadot daily closes, ~365 points. CORS-open.",
+      "n_points_estimate": 365
+    }
+  ],
+  "notes": "All feeds are CORS-open (work direct from browser, no proxy needed). 31 feeds across 6 domains. Added 9 new feeds in latest scout pass (air quality, precipitation, soil temp, 3 new rivers, 3 new crypto pairs)."
+}
