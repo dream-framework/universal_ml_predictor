@@ -130,10 +130,19 @@ app.post('/groq-chat', async (req, res) => {
     const systemPrompt = `You are the Predictor bot. You analyze time series and explain what you see in plain English — DETAILED but LACONIC.
 
 PAYLOAD FIELDS:
-- series: label, source, n_points, latest_t, unit, first_value, last_value
+- series: label, source, n_points, latest_t, unit, first_value, last_value, pct_change
 - fit.r2: 0-1 score, higher = more predictable structure
 - verdict: HOLDS (structured), WEAK (mixed), FAILS (noisy)
 - ml: model_*/baseline_* for hit_rate, next_return, mae; n_test, n_train
+
+CRITICAL — NUMBERS:
+- series.pct_change is the PERCENTAGE change from first to last value. USE THIS for the change magnitude.
+  Example: pct_change=1.67 means a 1.67% change. Do NOT call it "double-digit" — 1.67% is a single-digit percentage.
+  Example: pct_change=12.3 means a 12.3% change — that IS a double-digit percentage change.
+- Do NOT confuse the price/value magnitude (e.g. $82,739) with the percentage change (e.g. 1.67%).
+- $82,739 is the PRICE. 1.67% is the CHANGE. These are completely different numbers.
+- Cite the percentage change as "X.X%" using pct_change. Cite the price as "$Y" using last_value.
+- If pct_change is null, compute it as ((last_value - first_value) / |first_value| * 100) and state the result as "X.X%".
 
 STYLE — DETAILED BUT LACONIC:
 - Aim for 4-6 sentences total, split across 2 short paragraphs.
@@ -180,6 +189,14 @@ STYLE — DETAILED BUT LACONIC:
         next_prediction: cls.models?.next_prediction,
       };
 
+      // Compute percentage change so Groq doesn't have to — prevents the LLM
+      // from confusing the price magnitude ($82,739) with the percentage change
+      // (1.67%) and calling it a "double-digit jump."
+      const firstVal = s.first_value;
+      const lastVal = s.last_value;
+      const pctChange = (firstVal && Number.isFinite(firstVal) && lastVal && Number.isFinite(lastVal))
+        ? ((lastVal - firstVal) / Math.abs(firstVal) * 100) : null;
+
       const slim = {
         series: {
           label: s.label,
@@ -189,6 +206,7 @@ STYLE — DETAILED BUT LACONIC:
           unit: s.unit,
           first_value: s.first_value,
           last_value: s.last_value,
+          pct_change: pctChange !== null ? Number(pctChange.toFixed(2)) : null,
         },
         fit: analysis?.fit,
         verdict: analysis?.verdict,
@@ -221,7 +239,7 @@ STYLE — DETAILED BUT LACONIC:
         model: model || DEFAULT_MODEL,
         messages,
         temperature: 0.3,
-        max_tokens: 450,
+        max_tokens: 800,
       }),
     });
 

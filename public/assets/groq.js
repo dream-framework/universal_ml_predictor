@@ -20,10 +20,12 @@ function isConfigured() {
 async function callBackend(payload) {
   if (!BACKEND_URL) throw new Error('Backend URL not set. Edit public/assets/groq.js and set BACKEND_URL to your deployed Render URL. See DEPLOY.md.');
 
-  // 30s timeout — Render free tier takes ~20s to wake from sleep
+  // 45s timeout — Render free tier takes ~20s to wake from sleep, then Groq
+  // can take another 10-15s to generate the response. 30s was cutting off
+  // mid-stream on cold starts.
   const attempt = async () => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 45000);
     try {
       const r = await fetch(BACKEND_URL + '/groq-chat', {
         method: 'POST',
@@ -43,7 +45,7 @@ async function callBackend(payload) {
       return j.reply || '(no reply)';
     } catch (err) {
       clearTimeout(timeout);
-      if (err.name === 'AbortError') throw new Error('Backend timed out (30s). Render free tier may be waking up — try again in a moment.');
+      if (err.name === 'AbortError') throw new Error('Backend timed out (45s). Render free tier may be waking up — try again in a moment.');
       throw err;
     }
   };
